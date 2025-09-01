@@ -34,5 +34,11 @@ return [
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
     ],
+       'movider' => [
+        'api_url' => env('MOVIDER_API_URL', 'https://api.movider.co/v1/sms'),
+        'api_key' => env('MOVIDER_API_KEY','XmrzzQ9HPnjWlWz3UHuraSxCkfT1t4') ,
+        'api_secret' => env('MOVIDER_API_SECRET','3P8NhUew5Y9X5jiuVZAZTl4a3f0-jf'),
+        'sender_id' => env('MOVIDER_SENDER_ID', 'rehab_app'),
+    ],
 
 ];
