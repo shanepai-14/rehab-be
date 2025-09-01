@@ -28,18 +28,28 @@ class MoviderSmsService
         $formattedNumber = $this->formatPhoneNumber($contactNumber);
         
         try {
-            $response = Http::asForm()  // This ensures form-encoded data
+            // Method 1: Disable SSL verification for development (NOT for production)
+            $httpClient = Http::asForm()
                 ->withHeaders([
                     'accept' => 'application/json',
                     'content-type' => 'application/x-www-form-urlencoded',
-                ])
-                ->post($this->apiUrl, [
-                    'api_key' => $this->apiKey,
-                    'api_secret' => $this->apiSecret,
-                    'from' => $this->senderId,
-                    'to' => $formattedNumber,
-                    'text' => $message
                 ]);
+
+            // For development only - disable SSL verification
+            if (config('app.env') === 'local') {
+                $httpClient = $httpClient->withOptions([
+                    'verify' => false, // Disable SSL certificate verification
+                    'timeout' => 30,
+                ]);
+            }
+
+            $response = $httpClient->post($this->apiUrl, [
+                'api_key' => $this->apiKey,
+                'api_secret' => $this->apiSecret,
+                'from' => $this->senderId,
+                'to' => $formattedNumber,
+                'text' => $message
+            ]);
 
             if ($response->successful()) {
                 $responseData = $response->json();
@@ -63,6 +73,68 @@ class MoviderSmsService
             }
         } catch (\Exception $e) {
             Log::error("SMS sending failed", [
+                'contact_number' => $formattedNumber,
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            return [
+                'success' => false,
+                'error' => $e->getMessage()
+            ];
+        }
+    }
+
+    /**
+     * Alternative method using Guzzle directly with SSL options
+     */
+    public function sendOtpWithGuzzle($contactNumber, $otpCode)
+    {
+        $message = "Your verification code is: {$otpCode}. This code will expire in 5 minutes. Do not share this code with anyone.";
+        $formattedNumber = $this->formatPhoneNumber($contactNumber);
+        
+        try {
+            $client = new \GuzzleHttp\Client([
+                'timeout' => 30,
+                'verify' => config('app.env') === 'production', // Only verify SSL in production
+            ]);
+
+            $response = $client->request('POST', $this->apiUrl, [
+                'form_params' => [
+                    'api_key' => $this->apiKey,
+                    'api_secret' => $this->apiSecret,
+                    'from' => $this->senderId,
+                    'to' => $formattedNumber,
+                    'text' => $message
+                ],
+                'headers' => [
+                    'accept' => 'application/json',
+                    'content-type' => 'application/x-www-form-urlencoded',
+                ],
+            ]);
+
+            $responseData = json_decode($response->getBody(), true);
+            
+            if ($response->getStatusCode() === 200) {
+                Log::info("SMS sent successfully to {$formattedNumber}", [
+                    'response' => $responseData
+                ]);
+                return [
+                    'success' => true,
+                    'data' => $responseData
+                ];
+            } else {
+                Log::error("Failed to send SMS to {$formattedNumber}", [
+                    'status' => $response->getStatusCode(),
+                    'response' => $responseData
+                ]);
+                return [
+                    'success' => false,
+                    'error' => $responseData,
+                    'status' => $response->getStatusCode()
+                ];
+            }
+        } catch (\Exception $e) {
+            Log::error("SMS sending failed with Guzzle", [
                 'contact_number' => $formattedNumber,
                 'error' => $e->getMessage()
             ]);
@@ -120,18 +192,27 @@ class MoviderSmsService
         $message = "Your verification code is: {$otpCode}. This code will expire in 5 minutes. Do not share this code with anyone.";
         
         try {
-            $response = Http::asForm()
+            $httpClient = Http::asForm()
                 ->withHeaders([
                     'accept' => 'application/json',
                     'content-type' => 'application/x-www-form-urlencoded',
-                ])
-                ->post($this->apiUrl, [
-                    'api_key' => $this->apiKey,
-                    'api_secret' => $this->apiSecret,
-                    'from' => $this->senderId,
-                    'to' => $recipients,
-                    'text' => $message
                 ]);
+
+            // For development only - disable SSL verification
+            if (config('app.env') === 'local') {
+                $httpClient = $httpClient->withOptions([
+                    'verify' => false,
+                    'timeout' => 30,
+                ]);
+            }
+
+            $response = $httpClient->post($this->apiUrl, [
+                'api_key' => $this->apiKey,
+                'api_secret' => $this->apiSecret,
+                'from' => $this->senderId,
+                'to' => $recipients,
+                'text' => $message
+            ]);
 
             if ($response->successful()) {
                 $responseData = $response->json();

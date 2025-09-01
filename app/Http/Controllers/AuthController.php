@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api;
+namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -107,7 +107,7 @@ class AuthController extends Controller
                 'province' => 'required|string|max:255',
                 'district' => 'required|in:1,2,3',
                 'email' => 'nullable|email|unique:users,email',
-                'password' => 'required|string|min:8|confirmed'
+                'password' => 'required|string|min:8|same:confirm_password',
             ]);
 
             if ($validator->fails()) {
