@@ -11,6 +11,8 @@ class User extends Authenticatable
 {
     use HasFactory, Notifiable, HasApiTokens;
 
+ 
+
     protected $fillable = [
         'last_name',
         'first_name', 
@@ -76,5 +78,70 @@ class User extends Authenticatable
     public function createdUsers()
     {
         return $this->hasMany(User::class, 'created_by');
+    }
+
+       public function patientAppointments()
+    {
+        return $this->hasMany(Appointment::class, 'patient_id');
+    }
+
+    public function doctorAppointments()
+    {
+        return $this->hasMany(Appointment::class, 'doctor_id');
+    }
+
+    public function createdAppointments()
+    {
+        return $this->hasMany(Appointment::class, 'created_by');
+    }
+
+    public function getDistrictNameAttribute()
+    {
+        $districts = [
+            '1' => 'District 1',
+            '2' => 'District 2', 
+            '3' => 'District 3'
+        ];
+        
+        return $districts[$this->district] ?? 'Unknown District';
+    }
+
+        public function scopeInDistrict($query, $district)
+    {
+        return $query->where('district', $district);
+    }
+
+        public function scopeVerified($query)
+    {
+        return $query->where('is_verified', true);
+    }
+
+        public function canAccessPatient(User $patient)
+    {
+        if ($this->role === self::ROLE_ADMIN) {
+            return true;
+        }
+
+        if ($this->role === self::ROLE_DOCTOR) {
+            return $this->district === $patient->district;
+        }
+
+        return false;
+    }
+
+        public function canCreateAppointments()
+    {
+        return in_array($this->role, [self::ROLE_DOCTOR, self::ROLE_ADMIN]);
+    }
+
+    public function getPatientsInDistrict()
+    {
+        if ($this->role !== self::ROLE_DOCTOR) {
+            return collect();
+        }
+
+        return User::where('role', self::ROLE_PATIENT)
+                   ->where('district', $this->district)
+                   ->get();
     }
 }
