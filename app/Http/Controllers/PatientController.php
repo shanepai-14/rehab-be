@@ -4,9 +4,18 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
-
+use App\Services\NotificationService;
+use Illuminate\Support\Facades\Validator;
+use App\Models\Appointment;
 class PatientController extends Controller
 {
+
+     protected $notificationService;
+
+    public function __construct(NotificationService $notificationService)
+    {
+        $this->notificationService = $notificationService;
+    }
  
     /**
      * Get patient dashboard data
@@ -110,4 +119,42 @@ class PatientController extends Controller
             ], 500);
         }
     }
+
+    public function cancelAppointment(Request $request, Appointment $appointment)
+{
+    try {
+        $validator = Validator::make($request->all(), [
+            'reason' => 'nullable|string|max:255'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $appointment->update([
+            'status' => 'cancelled',
+            'notes' => $request->reason ? "Cancelled by patient: " . $request->reason : "Cancelled by patient",
+            'updated_by' => $request->user()->id
+        ]);
+
+        $this->notificationService->sendAppointmentNotifications($appointment, 'cancelled');
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Appointment cancelled successfully',
+            'data' => $appointment->load(['patient', 'doctor'])
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to cancel appointment',
+            'error' => config('app.debug') ? $e->getMessage() : null
+        ], 500);
+    }
+}
 }

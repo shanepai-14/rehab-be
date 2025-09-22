@@ -17,6 +17,7 @@ return Application::configure(basePath: dirname(__DIR__))
         // Register custom middleware
         $middleware->alias([
             'role' => \App\Http\Middleware\CheckRole::class,
+            'verified' => \App\Http\Middleware\EnsureUserIsVerified::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions) {
