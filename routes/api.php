@@ -44,8 +44,7 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
         Route::get('/', [AppointmentController::class, 'index']);
         
         // Create appointment (doctors and admins only)
-        Route::post('/', [AppointmentController::class, 'create'])
-             ->middleware('can:create-appointments');
+        Route::post('/', [AppointmentController::class, 'create']);
         
         // Get single appointment
         Route::get('/{appointment}', [AppointmentController::class, 'show'])

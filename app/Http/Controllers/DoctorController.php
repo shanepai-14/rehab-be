@@ -111,9 +111,9 @@ class DoctorController extends Controller
                 $search = $request->search;
                 $query->where(function ($q) use ($search) {
                     $q->where('first_name', 'like', "%{$search}%")
-                      ->orWhere('last_name', 'like', "%{$search}%")
-                      ->orWhere('contact_number', 'like', "%{$search}%")
-                      ->orWhere('email', 'like', "%{$search}%");
+                    ->orWhere('last_name', 'like', "%{$search}%")
+                    ->orWhere('contact_number', 'like', "%{$search}%")
+                    ->orWhere('email', 'like', "%{$search}%");
                 });
             }
 
@@ -131,6 +131,7 @@ class DoctorController extends Controller
                 'email',
                 'address',
                 'sex',
+                'district',
                 'birth_date',
                 'is_verified',
                 'created_at'
@@ -139,12 +140,18 @@ class DoctorController extends Controller
             ->orderBy('first_name')
             ->paginate(15);
 
+            // Append district_name for each patient
+            $patients->getCollection()->transform(function ($patient) {
+                $patient->append('district_name');
+                return $patient;
+            });
+
             return response()->json([
                 'success' => true,
                 'data' => $patients,
                 'district_info' => [
                     'doctor_district' => $user->district,
-                    'district_name' => $user->district_name
+                    'district_name'   => $user->district_name,
                 ]
             ]);
 
@@ -156,6 +163,7 @@ class DoctorController extends Controller
             ], 500);
         }
     }
+
 
     /**
      * Get appointments for the doctor

@@ -4,6 +4,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Carbon\Carbon;
 
 class Appointment extends Model
 {
@@ -26,8 +27,7 @@ class Appointment extends Model
     ];
 
     protected $casts = [
-        'appointment_date' => 'date',
-        'appointment_time' => 'time',
+        'appointment_date' => 'date:Y-m-d',
         'duration' => 'integer'
     ];
 
@@ -84,4 +84,21 @@ class Appointment extends Model
     {
         return date('g:i A', strtotime($this->appointment_time));
     }
+
+    public function getAppointmentTimeAttribute($value)
+    {
+        if ($value) {
+
+            return Carbon::parse($value)->format('H:i');
+        }
+        return $value;
+    }
+
+    public function setAppointmentTimeAttribute($value)
+    {
+        if ($value) {
+            $this->attributes['appointment_time'] = Carbon::parse($value)->format('H:i:s');
+        }
+    }
 }
+
