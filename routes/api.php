@@ -75,10 +75,7 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
     Route::middleware('role:patient')->prefix('patient')->group(function () {
         Route::get('/dashboard', [PatientController::class, 'dashboard']);
         Route::get('/appointments', [PatientController::class, 'appointments']);
-        Route::get('/appointments/{appointment}', [PatientController::class, 'getAppointment'])
-             ->middleware('can:view,appointment');
-        Route::patch('/appointments/{appointment}/cancel', [PatientController::class, 'cancelAppointment'])
-             ->middleware('can:view,appointment');
+        Route::patch('/appointments/{appointment}/cancel', [PatientController::class, 'cancelAppointment']);
     });
 
     // ========== DOCTOR ROUTES ==========
