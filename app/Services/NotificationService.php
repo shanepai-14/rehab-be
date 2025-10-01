@@ -10,7 +10,7 @@ use App\Events\AppointmentCreated;
 use App\Events\AppointmentUpdated;
 use App\Events\AppointmentStatusChanged;
 use App\Events\AppointmentReminder;
-use Illuminate\Support\Facades\Http;
+use App\Events\SendSmsEvent;
 use Illuminate\Support\Facades\Log;
 
 class NotificationService
@@ -32,22 +32,11 @@ class NotificationService
      */
     public function sendSmsNotification(Appointment $appointment, string $event)
     {
-        if (!config('services.movider.enabled', true)) {
-            Log::info('SMS notifications are disabled');
-            return;
-        }
 
         $message = $this->generateSmsMessage($appointment, $event);
-        $recipients = [$appointment->patient->contact_number];
+        $recipient = $appointment->patient->contact_number;
 
-        // Add doctor's number for certain events
-        if (in_array($event, ['created', 'cancelled', 'confirmed']) && $appointment->doctor && $appointment->doctor->contact_number) {
-            $recipients[] = $appointment->doctor->contact_number;
-        }
-
-        foreach ($recipients as $phone) {
-            $this->sendMoviderSms($phone, $message, $appointment->id, $event);
-        }
+        event(new SendSmsEvent($recipient, $message));    
     }
 
     /**
@@ -102,60 +91,7 @@ class NotificationService
         }
     }
 
-    /**
-     * Send SMS via Movider API
-     */
-    protected function sendMoviderSms(string $phone, string $message, int $appointmentId = null, string $event = null)
-    {
-        try {
-            // Clean phone number (remove spaces, dashes, etc.)
-            $cleanPhone = preg_replace('/[^0-9+]/', '', $phone);
-            
-            // Ensure phone number starts with country code for Philippines
-            if (substr($cleanPhone, 0, 1) === '0') {
-                $cleanPhone = '+63' . substr($cleanPhone, 1);
-            } elseif (substr($cleanPhone, 0, 3) !== '+63') {
-                $cleanPhone = '+63' . $cleanPhone;
-            }
 
-            $response = Http::timeout(30)->post(config('services.movider.endpoint'), [
-                'username' => config('services.movider.username'),
-                'password' => config('services.movider.password'),
-                'to' => $cleanPhone,
-                'text' => $message,
-                'from' => config('services.movider.sender_id', 'HealthApp')
-            ]);
-
-            if ($response->successful()) {
-                Log::info('SMS sent successfully', [
-                    'phone' => $cleanPhone,
-                    'appointment_id' => $appointmentId,
-                    'event' => $event,
-                    'response' => $response->json()
-                ]);
-                return true;
-            } else {
-                Log::error('Failed to send SMS - API Error', [
-                    'phone' => $cleanPhone,
-                    'appointment_id' => $appointmentId,
-                    'event' => $event,
-                    'status_code' => $response->status(),
-                    'response_body' => $response->body()
-                ]);
-                return false;
-            }
-
-        } catch (\Exception $e) {
-            Log::error('SMS sending error - Exception', [
-                'phone' => $phone,
-                'appointment_id' => $appointmentId,
-                'event' => $event,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            return false;
-        }
-    }
 
     /**
      * Generate SMS message based on appointment and event
@@ -188,6 +124,34 @@ class NotificationService
         ];
 
         return $messages[$event] ?? "Appointment Update: {$agenda} on {$date} at {$time}";
+    }
+
+        private function formatPhoneNumber($phoneNumber)
+    {
+        // Remove all non-numeric characters
+        $cleaned = preg_replace('/[^0-9]/', '', $phoneNumber);
+        
+        // If it starts with 63, it's already in the correct format for PH
+        if (substr($cleaned, 0, 2) === '63') {
+            return '+' . $cleaned;
+        }
+        
+        // If it starts with 0, replace with +63
+        if (substr($cleaned, 0, 1) === '0') {
+            return '+63' . substr($cleaned, 1);
+        }
+        
+        // If it starts with 9 and is 10 digits, assume it's a PH mobile number
+        if (substr($cleaned, 0, 1) === '9' && strlen($cleaned) === 10) {
+            return '+63' . $cleaned;
+        }
+        
+        // If it doesn't start with +, add it
+        if (substr($phoneNumber, 0, 1) !== '+') {
+            return '+' . $cleaned;
+        }
+        
+        return $phoneNumber;
     }
 
     /**
@@ -244,13 +208,7 @@ class NotificationService
         ];
     }
 
-    /**
-     * Test SMS functionality
-     */
-    public function testSms(string $phone, string $message = 'This is a test message from HealthApp.')
-    {
-        return $this->sendMoviderSms($phone, $message);
-    }
+
 
     /**
      * Get SMS configuration status

@@ -113,21 +113,10 @@ public function create(Request $request)
             $appointmentDateTime = Carbon::createFromFormat('Y-m-d H:i', $request->appointment_date . ' ' . $appointmentTime);
             $appointmentEndTime = $appointmentDateTime->copy()->addMinutes($duration);
             
-            \Log::info('Creating appointment with parsed datetime', [
-                'original_time' => $request->appointment_time,
-                'normalized_time' => $appointmentTime,
-                'parsed_datetime' => $appointmentDateTime->toDateTimeString(),
-                'end_datetime' => $appointmentEndTime->toDateTimeString(),
-                'duration' => $duration
-            ]);
+      
             
         } catch (\Exception $e) {
-            \Log::error('Failed to parse appointment datetime', [
-                'date' => $request->appointment_date,
-                'original_time' => $request->appointment_time,
-                'normalized_time' => $appointmentTime,
-                'error' => $e->getMessage()
-            ]);
+    
             
             return response()->json([
                 'success' => false,
@@ -189,7 +178,7 @@ public function create(Request $request)
         DB::commit();
 
         // Send notifications (uncomment when ready)
-        // $this->sendAppointmentNotifications($appointment, 'created');
+        $this->sendAppointmentNotifications($appointment, 'created');
 
         return response()->json([
             'success' => true,
@@ -214,14 +203,7 @@ public function create(Request $request)
  */
 private function checkScheduleOverlap($doctorId, $patientId, $startDateTime, $endDateTime, $excludeAppointmentId = null)
 {
-    \Log::info('Starting overlap check', [
-        'doctor_id' => $doctorId,
-        'patient_id' => $patientId,
-        'new_start' => $startDateTime->toDateTimeString(),
-        'new_end' => $endDateTime->toDateTimeString(),
-        'exclude_appointment_id' => $excludeAppointmentId,
-        'date_for_query' => $startDateTime->format('Y-m-d')
-    ]);
+
 
     // Check doctor schedule conflicts
     $doctorAppointments = Appointment::where('doctor_id', $doctorId)
@@ -233,19 +215,6 @@ private function checkScheduleOverlap($doctorId, $patientId, $startDateTime, $en
         ->with(['patient'])
         ->get();
 
-    \Log::info('Found doctor appointments for conflict check', [
-        'count' => $doctorAppointments->count(),
-        'appointments' => $doctorAppointments->map(function($apt) {
-            return [
-                'id' => $apt->id,
-                'date' => $apt->appointment_date,
-                'time' => $apt->appointment_time, // Should now be clean "09:00" format
-                'duration' => $apt->duration,
-                'status' => $apt->status,
-                'patient_name' => $apt->patient->first_name . ' ' . $apt->patient->last_name
-            ];
-        })->toArray()
-    ]);
 
     $doctorConflicts = $doctorAppointments->filter(function ($appointment) use ($startDateTime, $endDateTime) {
         try {
@@ -253,28 +222,14 @@ private function checkScheduleOverlap($doctorId, $patientId, $startDateTime, $en
             $existingStart = Carbon::createFromFormat('Y-m-d H:i', $appointment->appointment_date->format('Y-m-d') . ' ' . $appointment->appointment_time);
             $existingEnd = $existingStart->copy()->addMinutes($appointment->duration ?? 30);
             
-            \Log::debug('Checking doctor appointment overlap', [
-                'appointment_id' => $appointment->id,
-                'appointment_time' => $appointment->appointment_time,
-                'existing_start' => $existingStart->toDateTimeString(),
-                'existing_end' => $existingEnd->toDateTimeString(),
-                'new_start' => $startDateTime->toDateTimeString(),
-                'new_end' => $endDateTime->toDateTimeString(),
-                'overlaps' => $startDateTime->lt($existingEnd) && $endDateTime->gt($existingStart)
-            ]);
+
             
             // Check for overlap: new appointment overlaps if it starts before existing ends 
             // AND ends after existing starts
             return $startDateTime->lt($existingEnd) && $endDateTime->gt($existingStart);
             
         } catch (\Exception $e) {
-            \Log::error('Failed to parse existing appointment datetime', [
-                'appointment_id' => $appointment->id,
-                'date' => $appointment->appointment_date,
-                'time' => $appointment->appointment_time,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+
             return false;
         }
     });
@@ -282,12 +237,7 @@ private function checkScheduleOverlap($doctorId, $patientId, $startDateTime, $en
     if ($doctorConflicts->isNotEmpty()) {
         $conflictTime = $doctorConflicts->first();
         
-        \Log::warning('Doctor schedule conflict detected', [
-            'conflict_appointment_id' => $conflictTime->id,
-            'conflict_time' => $conflictTime->appointment_time,
-            'conflict_duration' => $conflictTime->duration,
-            'conflict_patient' => $conflictTime->patient->first_name . ' ' . $conflictTime->patient->last_name
-        ]);
+  
         
         try {
             $conflictStart = Carbon::createFromFormat('Y-m-d H:i', $conflictTime->appointment_date . ' ' . $conflictTime->appointment_time);
@@ -307,10 +257,6 @@ private function checkScheduleOverlap($doctorId, $patientId, $startDateTime, $en
                 ]
             ];
         } catch (\Exception $e) {
-            \Log::error('Failed to format conflict appointment time', [
-                'appointment_id' => $conflictTime->id,
-                'error' => $e->getMessage()
-            ]);
             
             return [
                 'success' => false,
@@ -338,19 +284,7 @@ private function checkScheduleOverlap($doctorId, $patientId, $startDateTime, $en
         ->with(['doctor'])
         ->get();
 
-    \Log::info('Found patient appointments for conflict check', [
-        'count' => $patientAppointments->count(),
-        'appointments' => $patientAppointments->map(function($apt) {
-            return [
-                'id' => $apt->id,
-                'date' => $apt->appointment_date,
-                'time' => $apt->appointment_time, // Should now be clean "09:00" format
-                'duration' => $apt->duration,
-                'status' => $apt->status,
-                'doctor_name' => $apt->doctor->first_name . ' ' . $apt->doctor->last_name
-            ];
-        })->toArray()
-    ]);
+
 
     $patientConflicts = $patientAppointments->filter(function ($appointment) use ($startDateTime, $endDateTime) {
         try {
@@ -358,26 +292,11 @@ private function checkScheduleOverlap($doctorId, $patientId, $startDateTime, $en
             $existingStart = Carbon::createFromFormat('Y-m-d H:i', $appointment->appointment_date . ' ' . $appointment->appointment_time);
             $existingEnd = $existingStart->copy()->addMinutes($appointment->duration ?? 30);
             
-            \Log::debug('Checking patient appointment overlap', [
-                'appointment_id' => $appointment->id,
-                'appointment_time' => $appointment->appointment_time,
-                'existing_start' => $existingStart->toDateTimeString(),
-                'existing_end' => $existingEnd->toDateTimeString(),
-                'new_start' => $startDateTime->toDateTimeString(),
-                'new_end' => $endDateTime->toDateTimeString(),
-                'overlaps' => $startDateTime->lt($existingEnd) && $endDateTime->gt($existingStart)
-            ]);
-            
+ 
             return $startDateTime->lt($existingEnd) && $endDateTime->gt($existingStart);
             
         } catch (\Exception $e) {
-            \Log::error('Failed to parse patient appointment datetime', [
-                'appointment_id' => $appointment->id,
-                'date' => $appointment->appointment_date,
-                'time' => $appointment->appointment_time,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
+
             return false;
         }
     });
@@ -385,12 +304,7 @@ private function checkScheduleOverlap($doctorId, $patientId, $startDateTime, $en
     if ($patientConflicts->isNotEmpty()) {
         $conflictTime = $patientConflicts->first();
         
-        \Log::warning('Patient schedule conflict detected', [
-            'conflict_appointment_id' => $conflictTime->id,
-            'conflict_time' => $conflictTime->appointment_time,
-            'conflict_duration' => $conflictTime->duration,
-            'conflict_doctor' => $conflictTime->doctor->first_name . ' ' . $conflictTime->doctor->last_name
-        ]);
+
         
         try {
             $conflictStart = Carbon::createFromFormat('Y-m-d H:i', $conflictTime->appointment_date . ' ' . $conflictTime->appointment_time);
@@ -426,7 +340,6 @@ private function checkScheduleOverlap($doctorId, $patientId, $startDateTime, $en
         }
     }
 
-    \Log::info('No schedule conflicts found');
     return ['success' => true];
 }
 
@@ -478,12 +391,7 @@ public function getAvailableSlots(Request $request)
                     
                     return $currentTime->lt($appointmentEnd) && $slotEnd->gt($appointmentStart);
                 } catch (\Exception $e) {
-                    \Log::warning('Invalid datetime in available slots check', [
-                        'appointment_id' => $appointment->id,
-                        'date' => $appointment->appointment_date,
-                        'time' => $appointment->appointment_time,
-                        'error' => $e->getMessage()
-                    ]);
+
                     return false;
                 }
             });

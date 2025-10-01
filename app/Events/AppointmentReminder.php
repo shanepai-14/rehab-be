@@ -24,7 +24,7 @@ class AppointmentReminder implements ShouldBroadcast
         $this->eventData = [
             'appointment_id' => $this->appointment->id,
             'event' => 'reminder',
-            'message' => 'Appointment reminder: You have an appointment tomorrow',
+            'message' => "Reminder: Your appointment with Dr. {$appointment->doctor?->full_name} is scheduled on {$appointment->formatted_date} at {$appointment->formatted_time}.",
             'appointment' => [
                 'id' => $this->appointment->id,
                 'agenda' => $this->appointment->agenda,
@@ -43,11 +43,11 @@ class AppointmentReminder implements ShouldBroadcast
     public function broadcastOn()
     {
         $channels = [
-            new PrivateChannel("user.{$this->appointment->patient_id}")
+            new Channel("user.{$this->appointment->patient->contact_number}")
         ];
 
         if ($this->appointment->doctor_id) {
-            $channels[] = new PrivateChannel("user.{$this->appointment->doctor_id}");
+            $channels[] = new Channel("user.{$this->appointment->doctor_id}");
         }
 
         return $channels;

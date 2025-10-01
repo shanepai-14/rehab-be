@@ -48,12 +48,12 @@ class AppointmentStatusChanged implements ShouldBroadcast
     public function broadcastOn()
     {
         $channels = [
-            new PrivateChannel("user.{$this->appointment->patient_id}"),
-            new PrivateChannel('admin.notifications')
+            new Channel("user.{$this->appointment->patient->contact_number}"),
+            new Channel('admin.notifications')
         ];
 
         if ($this->appointment->doctor_id) {
-            $channels[] = new PrivateChannel("user.{$this->appointment->doctor_id}");
+            $channels[] = new Channel("user.{$this->appointment->doctor_id}");
         }
 
         return $channels;

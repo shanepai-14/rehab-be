@@ -26,7 +26,7 @@ class AppointmentUpdated implements ShouldBroadcast
         $this->eventData = [
             'appointment_id' => $this->appointment->id,
             'event' => $event,
-            'message' => $this->generateMessage($event),
+            'message' => $this->generateMessage($event, $this->appointment->doctor->full_name),
             'appointment' => [
                 'id' => $this->appointment->id,
                 'agenda' => $this->appointment->agenda,
@@ -44,12 +44,12 @@ class AppointmentUpdated implements ShouldBroadcast
     public function broadcastOn()
     {
         $channels = [
-            new PrivateChannel("user.{$this->appointment->patient_id}"),
+            new Channel("user.{$this->appointment->patient->contact_number}"),
             new PrivateChannel('admin.notifications')
         ];
 
         if ($this->appointment->doctor_id) {
-            $channels[] = new PrivateChannel("user.{$this->appointment->doctor_id}");
+            $channels[] = new Channel("user.{$this->appointment->doctor_id}");
         }
 
         return $channels;
@@ -65,18 +65,20 @@ class AppointmentUpdated implements ShouldBroadcast
         return $this->eventData;
     }
 
-    private function generateMessage(string $event)
+    private function generateMessage(string $event, ?string $doctorName = null)
     {
+        $doctorText = $doctorName ? " with Dr. {$doctorName}" : "";
+
         $messages = [
-            'confirmed' => 'Your appointment has been confirmed',
-            'cancelled' => 'Your appointment has been cancelled',
-            'status_changed' => 'Your appointment status has been updated',
-            'reminder' => 'Appointment reminder',
-            'updated' => 'Your appointment has been updated',
-            'in_progress' => 'Your appointment is now in progress',
-            'completed' => 'Your appointment has been completed'
+            'confirmed'     => "Your appointment{$doctorText} has been confirmed",
+            'cancelled'     => "Your appointment{$doctorText} has been cancelled",
+            'status_changed'=> "Your appointment{$doctorText} status has been updated",
+            'reminder'      => "Reminder: You have an appointment{$doctorText} scheduled soon",
+            'updated'       => "Your appointment{$doctorText} has been updated",
+            'in_progress'   => "Your appointment{$doctorText} is now in progress",
+            'completed'     => "Your appointment{$doctorText} has been completed"
         ];
 
-        return $messages[$event] ?? 'Your appointment has been updated';
+        return $messages[$event] ?? "Your appointment{$doctorText} has been updated";
     }
 }

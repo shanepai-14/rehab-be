@@ -4,7 +4,7 @@ namespace App\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
-
+use App\Events\SendSmsEvent;
 class MoviderSmsService
 {
     private $apiUrl;
@@ -22,66 +22,80 @@ class MoviderSmsService
 
     public function sendOtp($contactNumber, $otpCode)
     {
+    
+        try {
         $message = "Your verification code is: {$otpCode}. This code will expire in 5 minutes. Do not share this code with anyone.";
         
         // Ensure the contact number is in E.164 format
         $formattedNumber = $this->formatPhoneNumber($contactNumber);
-        
-        try {
-            // Method 1: Disable SSL verification for development (NOT for production)
-            $httpClient = Http::asForm()
-                ->withHeaders([
-                    'accept' => 'application/json',
-                    'content-type' => 'application/x-www-form-urlencoded',
-                ]);
 
-            // For development only - disable SSL verification
-            if (config('app.env') === 'local') {
-                $httpClient = $httpClient->withOptions([
-                    'verify' => false, // Disable SSL certificate verification
-                    'timeout' => 30,
-                ]);
-            }
+        event(new SendSmsEvent($formattedNumber, $message));
 
-            $response = $httpClient->post($this->apiUrl, [
-                'api_key' => $this->apiKey,
-                'api_secret' => $this->apiSecret,
-                'from' => $this->senderId,
-                'to' => $formattedNumber,
-                'text' => $message
-            ]);
+          return [
+                'success' => true,
+            ];
 
-            if ($response->successful()) {
-                $responseData = $response->json();
-                Log::info("SMS sent successfully to {$formattedNumber}", [
-                    'response' => $responseData
-                ]);
-                return [
-                    'success' => true,
-                    'data' => $responseData
-                ];
-            } else {
-                Log::error("Failed to send SMS to {$formattedNumber}", [
-                    'status' => $response->status(),
-                    'response' => $response->body()
-                ]);
+            } catch (\Exception $e) {
                 return [
                     'success' => false,
-                    'error' => $response->body(),
-                    'status' => $response->status()
+                    'error' => $e->getMessage()
                 ];
-            }
-        } catch (\Exception $e) {
-            Log::error("SMS sending failed", [
-                'contact_number' => $formattedNumber,
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
-            return [
-                'success' => false,
-                'error' => $e->getMessage()
-            ];
         }
+        // try {
+        //     // Method 1: Disable SSL verification for development (NOT for production)
+        //     $httpClient = Http::asForm()
+        //         ->withHeaders([
+        //             'accept' => 'application/json',
+        //             'content-type' => 'application/x-www-form-urlencoded',
+        //         ]);
+
+        //     // For development only - disable SSL verification
+        //     if (config('app.env') === 'local') {
+        //         $httpClient = $httpClient->withOptions([
+        //             'verify' => false, // Disable SSL certificate verification
+        //             'timeout' => 30,
+        //         ]);
+        //     }
+
+        //     $response = $httpClient->post($this->apiUrl, [
+        //         'api_key' => $this->apiKey,
+        //         'api_secret' => $this->apiSecret,
+        //         'from' => $this->senderId,
+        //         'to' => $formattedNumber,
+        //         'text' => $message
+        //     ]);
+
+        //     if ($response->successful()) {
+        //         $responseData = $response->json();
+        //         Log::info("SMS sent successfully to {$formattedNumber}", [
+        //             'response' => $responseData
+        //         ]);
+        //         return [
+        //             'success' => true,
+        //             'data' => $responseData
+        //         ];
+        //     } else {
+        //         Log::error("Failed to send SMS to {$formattedNumber}", [
+        //             'status' => $response->status(),
+        //             'response' => $response->body()
+        //         ]);
+        //         return [
+        //             'success' => false,
+        //             'error' => $response->body(),
+        //             'status' => $response->status()
+        //         ];
+        //     }
+        // } catch (\Exception $e) {
+        //     Log::error("SMS sending failed", [
+        //         'contact_number' => $formattedNumber,
+        //         'error' => $e->getMessage(),
+        //         'trace' => $e->getTraceAsString()
+        //     ]);
+        //     return [
+        //         'success' => false,
+        //         'error' => $e->getMessage()
+        //     ];
+        // }
     }
 
     /**
@@ -91,58 +105,60 @@ class MoviderSmsService
     {
         $message = "Your verification code is: {$otpCode}. This code will expire in 5 minutes. Do not share this code with anyone.";
         $formattedNumber = $this->formatPhoneNumber($contactNumber);
+
+        event(new SendSmsEvent($formattedNumber, $message));
         
-        try {
-            $client = new \GuzzleHttp\Client([
-                'timeout' => 30,
-                'verify' => config('app.env') === 'production', // Only verify SSL in production
-            ]);
+        // try {
+        //     $client = new \GuzzleHttp\Client([
+        //         'timeout' => 30,
+        //         'verify' => config('app.env') === 'production', // Only verify SSL in production
+        //     ]);
 
-            $response = $client->request('POST', $this->apiUrl, [
-                'form_params' => [
-                    'api_key' => $this->apiKey,
-                    'api_secret' => $this->apiSecret,
-                    'from' => $this->senderId,
-                    'to' => $formattedNumber,
-                    'text' => $message
-                ],
-                'headers' => [
-                    'accept' => 'application/json',
-                    'content-type' => 'application/x-www-form-urlencoded',
-                ],
-            ]);
+        //     $response = $client->request('POST', $this->apiUrl, [
+        //         'form_params' => [
+        //             'api_key' => $this->apiKey,
+        //             'api_secret' => $this->apiSecret,
+        //             'from' => $this->senderId,
+        //             'to' => $formattedNumber,
+        //             'text' => $message
+        //         ],
+        //         'headers' => [
+        //             'accept' => 'application/json',
+        //             'content-type' => 'application/x-www-form-urlencoded',
+        //         ],
+        //     ]);
 
-            $responseData = json_decode($response->getBody(), true);
+        //     $responseData = json_decode($response->getBody(), true);
             
-            if ($response->getStatusCode() === 200) {
-                Log::info("SMS sent successfully to {$formattedNumber}", [
-                    'response' => $responseData
-                ]);
-                return [
-                    'success' => true,
-                    'data' => $responseData
-                ];
-            } else {
-                Log::error("Failed to send SMS to {$formattedNumber}", [
-                    'status' => $response->getStatusCode(),
-                    'response' => $responseData
-                ]);
-                return [
-                    'success' => false,
-                    'error' => $responseData,
-                    'status' => $response->getStatusCode()
-                ];
-            }
-        } catch (\Exception $e) {
-            Log::error("SMS sending failed with Guzzle", [
-                'contact_number' => $formattedNumber,
-                'error' => $e->getMessage()
-            ]);
-            return [
-                'success' => false,
-                'error' => $e->getMessage()
-            ];
-        }
+        //     if ($response->getStatusCode() === 200) {
+        //         Log::info("SMS sent successfully to {$formattedNumber}", [
+        //             'response' => $responseData
+        //         ]);
+        //         return [
+        //             'success' => true,
+        //             'data' => $responseData
+        //         ];
+        //     } else {
+        //         Log::error("Failed to send SMS to {$formattedNumber}", [
+        //             'status' => $response->getStatusCode(),
+        //             'response' => $responseData
+        //         ]);
+        //         return [
+        //             'success' => false,
+        //             'error' => $responseData,
+        //             'status' => $response->getStatusCode()
+        //         ];
+        //     }
+        // } catch (\Exception $e) {
+        //     Log::error("SMS sending failed with Guzzle", [
+        //         'contact_number' => $formattedNumber,
+        //         'error' => $e->getMessage()
+        //     ]);
+        //     return [
+        //         'success' => false,
+        //         'error' => $e->getMessage()
+        //     ];
+        // }
     }
 
     /**

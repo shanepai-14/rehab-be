@@ -27,7 +27,7 @@ class AppointmentCreated implements ShouldBroadcast
         $this->eventData = [
             'appointment_id' => $this->appointment->id,
             'event' => 'created',
-            'message' => 'New appointment created',
+            'message' => "Your appointment with Dr. {$this->appointment->doctor?->full_name} is scheduled on {$this->appointment->formatted_date} at {$this->appointment->formatted_time}.",
             'appointment' => [
                 'id' => $this->appointment->id,
                 'agenda' => $this->appointment->agenda,
@@ -45,14 +45,8 @@ class AppointmentCreated implements ShouldBroadcast
     public function broadcastOn()
     {
         $channels = [
-            new PrivateChannel("user.{$this->appointment->patient_id}"),
-            new PrivateChannel('admin.notifications')
+            new Channel("user.{$this->appointment->patient->contact_number}"),
         ];
-
-        // Add doctor channel if doctor is assigned
-        if ($this->appointment->doctor_id) {
-            $channels[] = new PrivateChannel("user.{$this->appointment->doctor_id}");
-        }
 
         return $channels;
     }
