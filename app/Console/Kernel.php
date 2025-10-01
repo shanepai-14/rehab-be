@@ -14,7 +14,7 @@ class Kernel extends ConsoleKernel
     {
         // Send appointment reminders every day at 8 AM
         $schedule->command('appointments:send-reminders')
-                 ->everyMinute()
+                 ->dailyAt('08:00')
                  ->withoutOverlapping();
 
         // Clean up old notifications (optional)
