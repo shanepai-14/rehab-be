@@ -262,6 +262,67 @@ class AuthController extends Controller
         }
     }
 
+    public function resendOtp(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'contact_number' => 'required|string|exists:users,contact_number'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid contact number',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            // Check if user exists and is not verified
+            $user = User::where('contact_number', $request->contact_number)->first();
+            
+            if ($user->is_verified) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Account is already verified.'
+                ], 400);
+            }
+
+            // Optional: Check for rate limiting (prevent spam)
+            $recentOtp = \App\Models\OtpVerification::where('contact_number', $request->contact_number)
+                ->where('created_at', '>', now()->subMinute())
+                ->first();
+
+            if ($recentOtp) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Please wait before requesting another code.'
+                ], 429);
+            }
+
+            // Generate and send new OTP
+            $otpSent = $this->otpService->generateOtp($request->contact_number);
+
+            if ($otpSent) {
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Verification code resent successfully.'
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to resend verification code.'
+                ], 500);
+            }
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to resend OTP. Please try again.',
+                'error' => config('app.debug') ? $e->getMessage() : null
+            ], 500);
+        }
+    }
+
     /**
      * Logout user (revoke token)
      */
