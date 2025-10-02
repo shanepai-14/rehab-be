@@ -9,7 +9,7 @@ Artisan::command('inspire', function () {
 })->purpose('Display an inspiring quote');
 
 Schedule::command('appointments:send-reminders')
-    ->dailyAt('11:00')
+    ->dailyAt('12:00')
     ->withoutOverlapping();
 
 Schedule::command('notifications:cleanup')
