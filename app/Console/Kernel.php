@@ -10,19 +10,7 @@ class Kernel extends ConsoleKernel
     /**
      * Define the application's command schedule.
      */
-    protected function schedule(Schedule $schedule): void
-    {
-        // Send appointment reminders every day at 8 AM
-        $schedule->command('appointments:send-reminders')
-                 ->dailyAt('08:00')
-                 ->withoutOverlapping();
-
-        // Clean up old notifications (optional)
-        $schedule->command('notifications:cleanup')
-                 ->weekly()
-                 ->sundays()
-                 ->at('01:00');
-    }
+ 
 
     /**
      * Register the commands for the application.
