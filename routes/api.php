@@ -6,7 +6,7 @@ use App\Http\Controllers\AppointmentController;
 use App\Http\Controllers\DoctorController;
 use App\Http\Controllers\PatientController;
 use App\Http\Controllers\AdminController;
-use App\Http\Controllers\NotificationTestController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\AuthController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -71,6 +71,13 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
              ->middleware('role:doctor,admin');
     });
 
+     Route::prefix('notifications')->group(function () {
+        Route::get('/', [NotificationController::class, 'index']);
+        Route::patch('/{id}/read', [NotificationController::class, 'markAsRead']);
+        Route::patch('/read-all', [NotificationController::class, 'markAllAsRead']);
+        Route::delete('/{id}', [NotificationController::class, 'destroy']);
+     });
+
     // ========== PATIENT ROUTES ==========
     Route::middleware('role:patient')->prefix('patient')->group(function () {
         Route::get('/dashboard', [PatientController::class, 'dashboard']);
@@ -116,13 +123,4 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
         Route::get('/system/health', [AdminController::class, 'getSystemHealth']);
     });
 
-    // ========== NOTIFICATION TEST ROUTES (Admin only) ==========
-    Route::middleware('role:admin')->prefix('test')->group(function () {
-        Route::post('/sms', [NotificationTestController::class, 'testSms']);
-        Route::post('/realtime', [NotificationTestController::class, 'testRealtime']);
-        Route::post('/appointment-notification', [NotificationTestController::class, 'testAppointmentNotification']);
-        Route::get('/notification-status', [NotificationTestController::class, 'getStatus']);
-        Route::post('/reminders', [NotificationTestController::class, 'testReminders']);
-        Route::get('/upcoming-appointments', [NotificationTestController::class, 'getUpcomingAppointments']);
-    });
 });

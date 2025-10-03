@@ -5,11 +5,10 @@ namespace App\Events;
 use App\Models\Appointment;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PresenceChannel;
-use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
+use App\Models\Notification;
 
 class AppointmentStatusChanged implements ShouldBroadcast
 {
@@ -19,16 +18,18 @@ class AppointmentStatusChanged implements ShouldBroadcast
     public $oldStatus;
     public $newStatus;
     public $eventData;
+    public $message;
 
     public function __construct(Appointment $appointment, string $oldStatus, string $newStatus)
     {
         $this->appointment = $appointment->load(['patient', 'doctor', 'createdBy']);
         $this->oldStatus = $oldStatus;
         $this->newStatus = $newStatus;
+        $this->message = "Appointment status changed from {$oldStatus} to {$newStatus}";
         $this->eventData = [
             'appointment_id' => $this->appointment->id,
             'event' => 'status_changed',
-            'message' => "Appointment status changed from {$oldStatus} to {$newStatus}",
+            'message' => $this->message,
             'old_status' => $oldStatus,
             'new_status' => $newStatus,
             'appointment' => [
@@ -43,6 +44,16 @@ class AppointmentStatusChanged implements ShouldBroadcast
             ],
             'timestamp' => now()->toISOString()
         ];
+
+        Notification::create([
+            'user_id' => $appointment->patient->id,
+            'title' => 'Appointment StatusChange',
+            'message' => $this->message,
+            'type' => 'info',
+            'related_type' => 'App\Models\Appointment',
+            'related_id' => $appointment->id,
+            'action_url' => '/appointments/' . $appointment->id
+        ]);
     }
 
     public function broadcastOn()

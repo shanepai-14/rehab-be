@@ -22,10 +22,13 @@ class User extends Authenticatable
         'address',
         'contact_number',
         'province',
+        'municipality',
+        'barangay',
         'district',
         'email',
         'password',
         'role',
+        'patient_type',
         'is_verified',
         'created_by'
     ];

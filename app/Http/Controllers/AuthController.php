@@ -105,8 +105,11 @@ class AuthController extends Controller
                 'address' => 'required|string|max:500',
                 'contact_number' => 'required|string|unique:users,contact_number|regex:/^09[0-9]{9}$/',
                 'province' => 'required|string|max:255',
+                'municipality' => 'required|string|max:255',
+                'barangay' => 'required|string|max:255',
                 'district' => 'required|in:1,2,3',
                 'email' => 'nullable|email|unique:users,email',
+                'patient_type' => 'required|string|max:255',
                 'password' => 'required|string|min:8|same:confirm_password',
             ]);
 

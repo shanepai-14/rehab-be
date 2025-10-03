@@ -1,20 +1,16 @@
 <?php
 
-// ========== APPOINTMENT CREATED EVENT ==========
-// app/Events/AppointmentCreated.php
-
+// app/Events/AppointmentCreatedForDoctor.php
 namespace App\Events;
 
 use App\Models\Appointment;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PresenceChannel;
-use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
-class AppointmentCreated implements ShouldBroadcast
+class AppointmentCreatedForDoctor implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
@@ -23,18 +19,21 @@ class AppointmentCreated implements ShouldBroadcast
 
     public function __construct(Appointment $appointment)
     {
-        $this->appointment = $appointment->load(['patient', 'doctor', 'createdBy']);
+        $this->appointment = $appointment->load(['patient', 'doctor']);
+        
+        $message = "Your appointment with Patient {$this->appointment->patient?->full_name} is scheduled on {$this->appointment->formatted_date} at {$this->appointment->formatted_time}.";
+        
         $this->eventData = [
             'appointment_id' => $this->appointment->id,
             'event' => 'created',
-            'message' => "Your appointment with Dr. {$this->appointment->doctor?->full_name} is scheduled on {$this->appointment->formatted_date} at {$this->appointment->formatted_time}.",
+            'message' => $message,
             'appointment' => [
                 'id' => $this->appointment->id,
                 'agenda' => $this->appointment->agenda,
                 'date' => $this->appointment->formatted_date,
                 'time' => $this->appointment->formatted_time,
                 'patient' => $this->appointment->patient->full_name,
-                'doctor' => $this->appointment->doctor ? $this->appointment->doctor->full_name : null,
+                'patient_contact_number' => $this->appointment->patient->contact_number,
                 'status' => $this->appointment->status,
                 'priority' => $this->appointment->priority
             ],
@@ -44,11 +43,7 @@ class AppointmentCreated implements ShouldBroadcast
 
     public function broadcastOn()
     {
-        $channels = [
-            new Channel("user.{$this->appointment->patient->contact_number}"),
-        ];
-
-        return $channels;
+        return new Channel("user.{$this->appointment->doctor->contact_number}");
     }
 
     public function broadcastAs()

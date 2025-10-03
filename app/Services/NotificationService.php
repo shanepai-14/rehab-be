@@ -6,10 +6,12 @@
 namespace App\Services;
 
 use App\Models\Appointment;
-use App\Events\AppointmentCreated;
+use App\Events\AppointmentCreatedForPatient;
+use App\Events\AppointmentCreatedForDoctor;
 use App\Events\AppointmentUpdated;
 use App\Events\AppointmentStatusChanged;
-use App\Events\AppointmentReminder;
+use App\Events\AppointmentReminderForDoctor;
+use App\Events\AppointmentReminderForPatient;
 use App\Events\SendSmsEvent;
 use Illuminate\Support\Facades\Log;
 
@@ -36,7 +38,8 @@ class NotificationService
         $message = $this->generateSmsMessage($appointment, $event);
         $recipient = $appointment->patient->contact_number;
 
-        event(new SendSmsEvent($recipient, $message));    
+        event(new SendSmsEvent($recipient, $message)); 
+    
     }
 
     /**
@@ -52,7 +55,8 @@ class NotificationService
         try {
             switch ($event) {
                 case 'created':
-                    event(new AppointmentCreated($appointment));
+                    event(new AppointmentCreatedForPatient($appointment));
+                    event(new AppointmentCreatedForDoctor($appointment));
                     break;
                 
                 case 'status_changed':
@@ -64,7 +68,8 @@ class NotificationService
                     break;
                 
                 case 'reminder':
-                    event(new AppointmentReminder($appointment));
+                    event(new AppointmentReminderForDoctor($appointment));
+                    event(new AppointmentReminderForPatient($appointment));
                     break;
                 
                 case 'confirmed':
