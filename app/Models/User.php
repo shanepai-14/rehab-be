@@ -28,6 +28,8 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
+        'license_number',        // NEW
+        'specialization',
         'patient_type',
         'is_verified',
         'created_by'

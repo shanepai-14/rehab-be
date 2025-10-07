@@ -8,8 +8,10 @@ use App\Http\Controllers\PatientController;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\AuthController;
+use App\Http\Controllers\ChatController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+
 
 /*
 |--------------------------------------------------------------------------
@@ -95,12 +97,9 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
         Route::get('/stats/district', [DoctorController::class, 'getDistrictStats']);
         
         // Quick appointment actions for doctors
-        Route::patch('/appointments/{appointment}/confirm', [DoctorController::class, 'confirmAppointment'])
-             ->middleware('can:update,appointment');
-        Route::patch('/appointments/{appointment}/start', [DoctorController::class, 'startAppointment'])
-             ->middleware('can:update,appointment');
-        Route::patch('/appointments/{appointment}/complete', [DoctorController::class, 'completeAppointment'])
-             ->middleware('can:update,appointment');
+        Route::patch('/appointments/{appointment}/confirm', [DoctorController::class, 'confirmAppointment']);
+        Route::patch('/appointments/{appointment}/start', [DoctorController::class, 'startAppointment']);
+        Route::patch('/appointments/{appointment}/complete', [DoctorController::class, 'completeAppointment']);
     });
 
     // ========== ADMIN ROUTES ==========
@@ -121,6 +120,14 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
         // District and system management
         Route::get('/districts/stats', [AdminController::class, 'getDistrictStats']);
         Route::get('/system/health', [AdminController::class, 'getSystemHealth']);
+    });
+
+        Route::prefix('chat')->group(function () {
+        Route::get('/users', [ChatController::class, 'getChatList']);
+        Route::get('/messages/{userId}', [ChatController::class, 'getMessages']);
+        Route::post('/send', [ChatController::class, 'sendMessage']);
+        Route::patch('/read/{userId}', [ChatController::class, 'markAsRead']);
+        Route::get('/unread-count', [ChatController::class, 'getUnreadCount']);
     });
 
 });

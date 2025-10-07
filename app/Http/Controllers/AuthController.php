@@ -74,8 +74,20 @@ class AuthController extends Controller
                     'name' => $user->full_name,
                     'email' => $user->email,
                     'contact_number' => $user->contact_number,
+                    'first_name' => $user->first_name,
+                    'last_name' => $user->last_name,
+                    'middle_initial' => $user->middle_initial,
+                    'province' => $user->province,
+                    'municipality' => $user->municipality,
+                    'barangay' => $user->barangay,
+                    'district' => $user->district,
+                    'patient_type' => $user->patient_type,
+                    'birth_date' => $user->birth_date,
                     'role' => $user->role,
-                    'is_verified' => $user->is_verified
+                    'created_at' => $user->created_at,
+                    'is_verified' => $user->is_verified,
+                    'specialization' => $user->specialization,
+                    'license_number' => $user->license_number,
                 ],
                 'token' => $token,
                 'token_type' => 'Bearer'
@@ -160,6 +172,69 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Registration failed. Please try again.',
+                'error' => config('app.debug') ? $e->getMessage() : null
+            ], 500);
+        }
+    }
+
+   
+
+
+/**
+ * Update patient profile
+ */
+    public function updateProfile(Request $request)
+    {
+        try {
+            $user = $request->user();
+            
+            $validator = Validator::make($request->all(), [
+                'first_name' => 'required|string|max:255',
+                'last_name' => 'required|string|max:255',
+                'middle_initial' => 'nullable|string|max:1',
+                'sex' => 'required|in:male,female,other',
+                'birth_date' => 'required|date|before:today',
+                'address' => 'required|string',
+                'province' => 'required|string|max:255',
+                'municipality' => 'nullable|string|max:255',
+                'barangay' => 'nullable|string|max:255',
+                'specialization' => 'nullable|string|max:255',
+                'license_number' => 'nullable|string|max:255'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            // Update only allowed fields
+            $user->update($request->only([
+                'first_name',
+                'last_name',
+                'middle_initial',
+                'sex',
+                'birth_date',
+                'address',
+                'province',
+                'municipality',
+                'barangay',
+                'specialization',
+                'license_number'
+            ]));
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Profile updated successfully',
+                'data' => $user->fresh()
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to update profile',
                 'error' => config('app.debug') ? $e->getMessage() : null
             ], 500);
         }

@@ -117,10 +117,9 @@ class DoctorController extends Controller
                 });
             }
 
-            // Filter by verification status if provided
-            if ($request->has('verified')) {
+      
                 $query->where('is_verified', $request->boolean('verified'));
-            }
+            
 
             $patients = $query->select([
                 'id', 
@@ -130,6 +129,10 @@ class DoctorController extends Controller
                 'contact_number', 
                 'email',
                 'address',
+                'municipality',
+                'province',
+                'barangay',
+                'patient_type',
                 'sex',
                 'district',
                 'birth_date',
@@ -168,62 +171,189 @@ class DoctorController extends Controller
     /**
      * Get appointments for the doctor
      */
-    public function getAppointments(Request $request)
-    {
-        try {
-            $user = $request->user();
+    // public function getAppointments(Request $request)
+    // {
+    //     try {
+    //         $user = $request->user();
 
-            if ($user->role !== User::ROLE_DOCTOR) {
-                return response()->json([
-                    'success' => false,
-                    'message' => 'Access denied. Only doctors can access this endpoint.'
-                ], 403);
-            }
+    //         if ($user->role !== User::ROLE_DOCTOR) {
+    //             return response()->json([
+    //                 'success' => false,
+    //                 'message' => 'Access denied. Only doctors can access this endpoint.'
+    //             ], 403);
+    //         }
 
-            $query = Appointment::with(['patient', 'createdBy'])
-                               ->where('doctor_id', $user->id);
+    //         $query = Appointment::with(['patient', 'createdBy'])
+    //                            ->where('doctor_id', $user->id);
 
-            // Apply date filters
-            if ($request->has('date_from')) {
-                $query->where('appointment_date', '>=', $request->date_from);
-            }
+    //         // Apply date filters
+    //         if ($request->has('date_from')) {
+    //             $query->where('appointment_date', '>=', $request->date_from);
+    //         }
 
-            if ($request->has('date_to')) {
-                $query->where('appointment_date', '<=', $request->date_to);
-            }
+    //         if ($request->has('date_to')) {
+    //             $query->where('appointment_date', '<=', $request->date_to);
+    //         }
 
-            // Apply status filter
-            if ($request->has('status')) {
-                $query->where('status', $request->status);
-            }
+    //         // Apply status filter
+    //         if ($request->has('status')) {
+    //             $query->where('status', $request->status);
+    //         }
 
-            // Apply priority filter
-            if ($request->has('priority')) {
-                $query->where('priority', $request->priority);
-            }
+    //         // Apply priority filter
+    //         if ($request->has('priority')) {
+    //             $query->where('priority', $request->priority);
+    //         }
 
-            // Default to showing upcoming appointments
-            if (!$request->has('date_from') && !$request->has('show_all')) {
-                $query->where('appointment_date', '>=', now()->toDateString());
-            }
+    //         // Default to showing upcoming appointments
+    //         if (!$request->has('date_from') && !$request->has('show_all')) {
+    //             $query->where('appointment_date', '>=', now()->toDateString());
+    //         }
 
-            $appointments = $query->orderBy('appointment_date')
-                                 ->orderBy('appointment_time')
-                                 ->paginate(15);
+    //         $appointments = $query->orderBy('appointment_date')
+    //                              ->orderBy('appointment_time')
+    //                              ->paginate(15);
 
-            return response()->json([
-                'success' => true,
-                'data' => $appointments
-            ]);
+    //         return response()->json([
+    //             'success' => true,
+    //             'data' => $appointments
+    //         ]);
 
-        } catch (\Exception $e) {
+    //     } catch (\Exception $e) {
+    //         return response()->json([
+    //             'success' => false,
+    //             'message' => 'Failed to retrieve appointments',
+    //             'error' => config('app.debug') ? $e->getMessage() : null
+    //         ], 500);
+    //     }
+    // }
+
+    /**
+ * Get appointments for the doctor with multiple patients support
+ */
+public function getAppointments(Request $request)
+{
+    try {
+        $user = $request->user();
+
+        if ($user->role !== User::ROLE_DOCTOR) {
             return response()->json([
                 'success' => false,
-                'message' => 'Failed to retrieve appointments',
-                'error' => config('app.debug') ? $e->getMessage() : null
-            ], 500);
+                'message' => 'Access denied. Only doctors can access this endpoint.'
+            ], 403);
         }
+
+        // Load appointments with multiple patients relationship
+        $query = Appointment::with(['patients', 'doctor', 'createdBy'])
+                           ->where('doctor_id', $user->id);
+
+        // Apply date filters
+        if ($request->has('date_from')) {
+            $query->where('appointment_date', '>=', $request->date_from);
+        }
+
+        if ($request->has('date_to')) {
+            $query->where('appointment_date', '<=', $request->date_to);
+        }
+
+        // Apply status filter
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+
+        // Apply priority filter
+        if ($request->has('priority')) {
+            $query->where('priority', $request->priority);
+        }
+
+        // Filter by multi-patient appointments only (optional)
+        if ($request->has('multi_patient') && $request->boolean('multi_patient')) {
+            $query->has('patients', '>', 1);
+        }
+
+        // Default to showing upcoming appointments
+        if (!$request->has('date_from') && !$request->has('show_all')) {
+            $query->where('appointment_date', '>=', now()->toDateString());
+        }
+
+        $appointments = $query->orderBy('appointment_date')
+                             ->orderBy('appointment_time')
+                             ->get();
+
+        // Format appointments with multiple patients data
+        $formattedAppointments = $appointments->map(function ($appointment) {
+            return [
+                'id' => $appointment->id,
+                
+                // Multiple patients data
+                'patients' => $appointment->patients->map(function ($patient) {
+                    return [
+                        'id' => $patient->id,
+                        'name' => $patient->first_name . ' ' . $patient->last_name,
+                        'first_name' => $patient->first_name,
+                        'last_name' => $patient->last_name,
+                        'contact_number' => $patient->contact_number,
+                        'district' => $patient->district,
+                        'municipality' => $patient->municipality ?? null,
+                        'barangay' => $patient->barangay ?? null,
+                        'patient_type' => $patient->patient_type ?? null
+                    ];
+                }),
+                'patient_count' => $appointment->patients->count(),
+                'patient_names' => $appointment->patient_names,
+                
+                // Backward compatibility - single patient data
+                'patient_id' => $appointment->patient_id,
+                'patient' => $appointment->patient ? 
+                    $appointment->patient->first_name . ' ' . $appointment->patient->last_name : 
+                    $appointment->patient_names,
+                
+                // Appointment details
+                'agenda' => $appointment->agenda,
+                'details' => $appointment->details,
+                'appointment_date' => $appointment->appointment_date->format('Y-m-d'),
+                'formatted_date' => $appointment->formatted_date,
+                'appointment_time' => $appointment->formatted_time,
+                'raw_time' => $appointment->appointment_time,
+                'location' => $appointment->location,
+                'duration' => $appointment->duration,
+                'priority' => $appointment->priority,
+                'status' => $appointment->status,
+                'notes' => $appointment->notes,
+                
+                // Meta information
+                'is_multi_patient' => $appointment->is_multi_patient,
+                'is_today' => $appointment->isToday(),
+                'is_upcoming' => $appointment->isUpcoming(),
+                'status_color' => $appointment->status_color,
+                'priority_color' => $appointment->priority_color,
+                
+                // Timestamps
+                'created_at' => $appointment->created_at,
+                'updated_at' => $appointment->updated_at,
+                'created_by' => $appointment->createdBy->first_name ?? 'System'
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $formattedAppointments,
+            'count' => $formattedAppointments->count(),
+            'meta' => [
+                'total_appointments' => $formattedAppointments->count(),
+                'multi_patient_count' => $formattedAppointments->where('is_multi_patient', true)->count(),
+                'single_patient_count' => $formattedAppointments->where('is_multi_patient', false)->count(),
+            ]
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to retrieve appointments',
+            'error' => config('app.debug') ? $e->getMessage() : null
+        ], 500);
     }
+}
 
     /**
      * Get patient details (only if patient is in doctor's district)
