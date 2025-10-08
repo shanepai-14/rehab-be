@@ -1,10 +1,10 @@
 <?php
 
-// app/Events/AppointmentReminderForPatient.php
-
 namespace App\Events;
 
 use App\Models\Appointment;
+use App\Models\User;
+use App\Models\Notification;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
@@ -16,16 +16,35 @@ class AppointmentReminderForPatient implements ShouldBroadcast
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public $appointment;
+    public $patient;
     public $eventData;
 
-    public function __construct(Appointment $appointment)
+    public function __construct(Appointment $appointment, User $patient)
     {
-        $this->appointment = $appointment->load(['patient', 'doctor']);
+        $this->appointment = $appointment->load(['doctor']);
+        $this->patient = $patient;
         
-        $message = "Reminder: Your appointment with Dr. {$appointment->doctor?->full_name} is scheduled on {$appointment->formatted_date} at {$appointment->formatted_time}.";
+        $patientName = $patient->first_name . ' ' . $patient->last_name;
+        $doctorName = $this->appointment->doctor 
+            ? $this->appointment->doctor->first_name . ' ' . $this->appointment->doctor->last_name 
+            : 'the doctor';
+        
+        $message = "Hello {$patientName}, reminder: You have an appointment with Dr. {$doctorName} tomorrow at {$this->appointment->formatted_time}.";
+        
+        // Create notification in database
+        Notification::create([
+            'user_id' => $patient->id,
+            'title' => 'Appointment Reminder',
+            'message' => $message,
+            'type' => 'warning',
+            'related_type' => 'App\Models\Appointment',
+            'related_id' => $this->appointment->id,
+            'action_url' => '/appointments/' . $this->appointment->id
+        ]);
         
         $this->eventData = [
             'appointment_id' => $this->appointment->id,
+            'patient_id' => $patient->id,
             'event' => 'reminder',
             'message' => $message,
             'appointment' => [
@@ -33,11 +52,10 @@ class AppointmentReminderForPatient implements ShouldBroadcast
                 'agenda' => $this->appointment->agenda,
                 'date' => $this->appointment->formatted_date,
                 'time' => $this->appointment->formatted_time,
-                'doctor' => $this->appointment->doctor ? $this->appointment->doctor->full_name : null,
-                'doctor_contact_number' => $this->appointment->doctor->contact_number,
+                'doctor' => $doctorName,
+                'doctor_contact_number' => $this->appointment->doctor?->contact_number,
                 'status' => $this->appointment->status,
-                'priority' => $this->appointment->priority,
-                'location' => $this->appointment->location
+                'priority' => $this->appointment->priority
             ],
             'timestamp' => now()->toISOString()
         ];
@@ -45,7 +63,7 @@ class AppointmentReminderForPatient implements ShouldBroadcast
 
     public function broadcastOn()
     {
-        return new Channel("user.{$this->appointment->patient->contact_number}");
+        return new Channel("user.{$this->patient->contact_number}");
     }
 
     public function broadcastAs()

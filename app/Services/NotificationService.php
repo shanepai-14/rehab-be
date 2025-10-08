@@ -34,67 +34,169 @@ class NotificationService
      */
     public function sendSmsNotification(Appointment $appointment, string $event)
     {
+        // Check if appointment has patients relationship
+        if ($appointment->patients && $appointment->patients->count() > 0) {
+            // Send SMS to each patient in the appointment
+            foreach ($appointment->patients as $patient) {
+                $message = $this->generateSmsMessage($appointment, $event, $patient);
+                $recipient = $patient->contact_number;
+                
 
-        $message = $this->generateSmsMessage($appointment, $event);
-        $recipient = $appointment->patient->contact_number;
+                    event(new SendSmsEvent($recipient, $message));
+              
+            }
+        } 
+        // Fallback to single patient if patients relationship doesn't exist
+        elseif ($appointment->patient) {
+            $message = $this->generateSmsMessage($appointment, $event, $appointment->patient);
+            $recipient = $appointment->patient->contact_number;
+            
 
-        event(new SendSmsEvent($recipient, $message)); 
-    
+                event(new SendSmsEvent($recipient, $message));
+       
+        }
     }
 
     /**
      * Send real-time notification via Laravel Events/Broadcasting
      */
+    // public function sendRealtimeNotification(Appointment $appointment, string $event, string $oldStatus = null)
+    // {
+    //     if (!config('broadcasting.default') || config('broadcasting.default') === 'null') {
+    //         Log::info('Broadcasting is disabled');
+    //         return;
+    //     }
+
+    //     try {
+    //         switch ($event) {
+    //             case 'created':
+    //                 event(new AppointmentCreatedForPatient($appointment));
+    //                 event(new AppointmentCreatedForDoctor($appointment));
+    //                 break;
+                
+    //             case 'status_changed':
+    //                 if ($oldStatus) {
+    //                     event(new AppointmentStatusChanged($appointment, $oldStatus, $appointment->status));
+    //                 } else {
+    //                     event(new AppointmentUpdated($appointment, $event));
+    //                 }
+    //                 break;
+                
+    //             case 'reminder':
+    //                 event(new AppointmentReminderForDoctor($appointment));
+    //                 event(new AppointmentReminderForPatient($appointment));
+    //                 break;
+                
+    //             case 'confirmed':
+    //             case 'cancelled':
+    //             case 'completed':
+    //             case 'in_progress':
+    //             case 'updated':
+    //             default:
+    //                 event(new AppointmentUpdated($appointment, $event));
+    //                 break;
+    //         }
+
+    //         Log::info('Real-time notification sent', [
+    //             'appointment_id' => $appointment->id,
+    //             'event' => $event
+    //         ]);
+
+    //     } catch (\Exception $e) {
+    //         Log::error('Failed to send real-time notification', [
+    //             'appointment_id' => $appointment->id,
+    //             'event' => $event,
+    //             'error' => $e->getMessage()
+    //         ]);
+    //     }
+    // }
+
     public function sendRealtimeNotification(Appointment $appointment, string $event, string $oldStatus = null)
-    {
-        if (!config('broadcasting.default') || config('broadcasting.default') === 'null') {
-            Log::info('Broadcasting is disabled');
-            return;
-        }
-
-        try {
-            switch ($event) {
-                case 'created':
-                    event(new AppointmentCreatedForPatient($appointment));
-                    event(new AppointmentCreatedForDoctor($appointment));
-                    break;
-                
-                case 'status_changed':
-                    if ($oldStatus) {
-                        event(new AppointmentStatusChanged($appointment, $oldStatus, $appointment->status));
-                    } else {
-                        event(new AppointmentUpdated($appointment, $event));
-                    }
-                    break;
-                
-                case 'reminder':
-                    event(new AppointmentReminderForDoctor($appointment));
-                    event(new AppointmentReminderForPatient($appointment));
-                    break;
-                
-                case 'confirmed':
-                case 'cancelled':
-                case 'completed':
-                case 'in_progress':
-                case 'updated':
-                default:
-                    event(new AppointmentUpdated($appointment, $event));
-                    break;
-            }
-
-            Log::info('Real-time notification sent', [
-                'appointment_id' => $appointment->id,
-                'event' => $event
-            ]);
-
-        } catch (\Exception $e) {
-            Log::error('Failed to send real-time notification', [
-                'appointment_id' => $appointment->id,
-                'event' => $event,
-                'error' => $e->getMessage()
-            ]);
-        }
+{
+    if (!config('broadcasting.default') || config('broadcasting.default') === 'null') {
+        Log::info('Broadcasting is disabled');
+        return;
     }
+
+    try {
+        switch ($event) {
+            case 'created':
+                // Send to all patients
+                if ($appointment->patients && $appointment->patients->count() > 0) {
+                    foreach ($appointment->patients as $patient) {
+                        event(new AppointmentCreatedForPatient($appointment, $patient));
+                    }
+                } elseif ($appointment->patient) {
+                    event(new AppointmentCreatedForPatient($appointment, $appointment->patient));
+                }
+                
+                // Send to doctor
+                event(new AppointmentCreatedForDoctor($appointment));
+                break;
+            
+            case 'status_changed':
+                // Send to all patients
+                if ($appointment->patients && $appointment->patients->count() > 0) {
+                    foreach ($appointment->patients as $patient) {
+                        if ($oldStatus) {
+                            event(new AppointmentStatusChanged($appointment, $patient, $oldStatus, $appointment->status));
+                        } else {
+                            event(new AppointmentUpdated($appointment, $patient, $event));
+                        }
+                    }
+                } elseif ($appointment->patient) {
+                    if ($oldStatus) {
+                        event(new AppointmentStatusChanged($appointment, $appointment->patient, $oldStatus, $appointment->status));
+                    } else {
+                        event(new AppointmentUpdated($appointment, $appointment->patient, $event));
+                    }
+                }
+                break;
+            
+            case 'reminder':
+                event(new AppointmentReminderForDoctor($appointment));
+                
+                // Send reminder to all patients
+                if ($appointment->patients && $appointment->patients->count() > 0) {
+                    foreach ($appointment->patients as $patient) {
+                        event(new AppointmentReminderForPatient($appointment, $patient));
+                    }
+                } elseif ($appointment->patient) {
+                    event(new AppointmentReminderForPatient($appointment, $appointment->patient));
+                }
+                break;
+            
+            case 'confirmed':
+            case 'cancelled':
+            case 'completed':
+            case 'in_progress':
+            case 'updated':
+            default:
+                // Send to all patients
+                if ($appointment->patients && $appointment->patients->count() > 0) {
+                    foreach ($appointment->patients as $patient) {
+                        event(new AppointmentUpdated($appointment, $patient, $event));
+                    }
+                } elseif ($appointment->patient) {
+                    event(new AppointmentUpdated($appointment, $appointment->patient, $event));
+                }
+                break;
+        }
+
+        Log::info('Real-time notification sent', [
+            'appointment_id' => $appointment->id,
+            'event' => $event,
+            'patient_count' => $appointment->patients ? $appointment->patients->count() : 1
+        ]);
+
+    } catch (\Exception $e) {
+        Log::error('Failed to send real-time notification', [
+            'appointment_id' => $appointment->id,
+            'event' => $event,
+            'error' => $e->getMessage()
+        ]);
+    }
+}
 
 
 

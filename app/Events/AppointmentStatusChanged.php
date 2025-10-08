@@ -3,76 +3,78 @@
 namespace App\Events;
 
 use App\Models\Appointment;
+use App\Models\User;
+use App\Models\Notification;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
-use App\Models\Notification;
 
 class AppointmentStatusChanged implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public $appointment;
+    public $patient;
     public $oldStatus;
     public $newStatus;
     public $eventData;
-    public $message;
 
-    public function __construct(Appointment $appointment, string $oldStatus, string $newStatus)
+    public function __construct(Appointment $appointment, User $patient, string $oldStatus, string $newStatus)
     {
-        $this->appointment = $appointment->load(['patient', 'doctor', 'createdBy']);
+        $this->appointment = $appointment->load(['doctor']);
+        $this->patient = $patient;
         $this->oldStatus = $oldStatus;
         $this->newStatus = $newStatus;
-        $this->message = "Appointment status changed from {$oldStatus} to {$newStatus}";
+        
+        $patientName = $patient->first_name . ' ' . $patient->last_name;
+        $doctorName = $this->appointment->doctor 
+            ? $this->appointment->doctor->first_name . ' ' . $this->appointment->doctor->last_name 
+            : 'the doctor';
+        
+        $message = "Hello {$patientName}, your appointment status with Dr. {$doctorName} has changed from {$oldStatus} to {$newStatus}.";
+        
+        // Create notification in database
+        Notification::create([
+            'user_id' => $patient->id,
+            'title' => 'Appointment Status Changed',
+            'message' => $message,
+            'type' => 'info',
+            'related_type' => 'App\Models\Appointment',
+            'related_id' => $this->appointment->id,
+            'action_url' => '/appointments/' . $this->appointment->id
+        ]);
+        
         $this->eventData = [
             'appointment_id' => $this->appointment->id,
+            'patient_id' => $patient->id,
             'event' => 'status_changed',
-            'message' => $this->message,
             'old_status' => $oldStatus,
             'new_status' => $newStatus,
+            'message' => $message,
             'appointment' => [
                 'id' => $this->appointment->id,
                 'agenda' => $this->appointment->agenda,
                 'date' => $this->appointment->formatted_date,
                 'time' => $this->appointment->formatted_time,
-                'patient' => $this->appointment->patient->full_name,
-                'doctor' => $this->appointment->doctor ? $this->appointment->doctor->full_name : null,
+                'doctor' => $doctorName,
+                'doctor_contact_number' => $this->appointment->doctor?->contact_number,
                 'status' => $this->appointment->status,
                 'priority' => $this->appointment->priority
             ],
             'timestamp' => now()->toISOString()
         ];
-
-        Notification::create([
-            'user_id' => $appointment->patient->id,
-            'title' => 'Appointment StatusChange',
-            'message' => $this->message,
-            'type' => 'info',
-            'related_type' => 'App\Models\Appointment',
-            'related_id' => $appointment->id,
-            'action_url' => '/appointments/' . $appointment->id
-        ]);
     }
 
     public function broadcastOn()
     {
-        $channels = [
-            new Channel("user.{$this->appointment->patient->contact_number}"),
-            new Channel('admin.notifications')
-        ];
-
-        if ($this->appointment->doctor_id) {
-            $channels[] = new Channel("user.{$this->appointment->doctor_id}");
-        }
-
-        return $channels;
+        return new Channel("user.{$this->patient->contact_number}");
     }
 
     public function broadcastAs()
     {
-        return 'appointment.status.changed';
+        return 'appointment.status_changed';
     }
 
     public function broadcastWith()

@@ -3,93 +3,122 @@
 namespace App\Events;
 
 use App\Models\Appointment;
+use App\Models\User;
+use App\Models\Notification;
 use Illuminate\Broadcasting\Channel;
 use Illuminate\Broadcasting\InteractsWithSockets;
-use Illuminate\Broadcasting\PrivateChannel;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
-use App\Models\Notification;
+
 class AppointmentUpdated implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
 
     public $appointment;
-    public $eventData;
+    public $patient;
     public $event;
-    public $message;
+    public $eventData;
 
-    public function __construct(Appointment $appointment, string $event = 'updated')
+    public function __construct(Appointment $appointment, User $patient, string $event)
     {
-        $this->appointment = $appointment->load(['patient', 'doctor', 'createdBy']);
+        $this->appointment = $appointment->load(['doctor']);
+        $this->patient = $patient;
         $this->event = $event;
-        $this->message = $this->generateMessage($event, $this->appointment->doctor->full_name);
+        
+        $patientName = $patient->first_name . ' ' . $patient->last_name;
+        $message = $this->generateMessage($patientName, $event);
+        $notificationType = $this->getNotificationType($event);
+        
+        // Create notification in database
+        Notification::create([
+            'user_id' => $patient->id,
+            'title' => $this->getNotificationTitle($event),
+            'message' => $message,
+            'type' => $notificationType,
+            'related_type' => 'App\Models\Appointment',
+            'related_id' => $this->appointment->id,
+            'action_url' => '/appointments/' . $this->appointment->id
+        ]);
+        
         $this->eventData = [
             'appointment_id' => $this->appointment->id,
+            'patient_id' => $patient->id,
             'event' => $event,
-            'message' => $this->message,
+            'message' => $message,
             'appointment' => [
                 'id' => $this->appointment->id,
                 'agenda' => $this->appointment->agenda,
                 'date' => $this->appointment->formatted_date,
                 'time' => $this->appointment->formatted_time,
-                'patient' => $this->appointment->patient->full_name,
-                'doctor' => $this->appointment->doctor ? $this->appointment->doctor->full_name : null,
+                'doctor' => $this->appointment->doctor 
+                    ? $this->appointment->doctor->first_name . ' ' . $this->appointment->doctor->last_name 
+                    : null,
+                'doctor_contact_number' => $this->appointment->doctor?->contact_number,
                 'status' => $this->appointment->status,
                 'priority' => $this->appointment->priority
             ],
             'timestamp' => now()->toISOString()
         ];
+    }
 
-        Notification::create([
-            'user_id' => $appointment->patient->id,
-            'title' => 'Appointment Update',
-            'message' => $this->message,
-            'type' => 'info',
-            'related_type' => 'App\Models\Appointment',
-            'related_id' => $appointment->id,
-            'action_url' => '/appointments/' . $appointment->id
-        ]);
+    private function generateMessage($patientName, $event)
+    {
+        $doctorName = $this->appointment->doctor 
+            ? $this->appointment->doctor->first_name . ' ' . $this->appointment->doctor->last_name 
+            : 'the doctor';
+        $date = $this->appointment->formatted_date;
+        $time = $this->appointment->formatted_time;
+
+        $messages = [
+            'updated' => "Hello {$patientName}, your appointment with Dr. {$doctorName} has been updated to {$date} at {$time}.",
+            'confirmed' => "Hello {$patientName}, your appointment with Dr. {$doctorName} on {$date} at {$time} has been confirmed.",
+            'cancelled' => "Hello {$patientName}, your appointment with Dr. {$doctorName} scheduled for {$date} at {$time} has been cancelled.",
+            'completed' => "Hello {$patientName}, your appointment with Dr. {$doctorName} has been completed. Thank you for your visit!",
+            'in_progress' => "Hello {$patientName}, your appointment with Dr. {$doctorName} is now in progress.",
+        ];
+
+        return $messages[$event] ?? "Hello {$patientName}, there's an update regarding your appointment with Dr. {$doctorName}.";
+    }
+
+    private function getNotificationTitle($event)
+    {
+        $titles = [
+            'updated' => 'Appointment Updated',
+            'confirmed' => 'Appointment Confirmed',
+            'cancelled' => 'Appointment Cancelled',
+            'completed' => 'Appointment Completed',
+            'in_progress' => 'Appointment In Progress',
+        ];
+
+        return $titles[$event] ?? 'Appointment Update';
+    }
+
+    private function getNotificationType($event)
+    {
+        $types = [
+            'updated' => 'info',
+            'confirmed' => 'success',
+            'cancelled' => 'error',
+            'completed' => 'success',
+            'in_progress' => 'info',
+        ];
+
+        return $types[$event] ?? 'info';
     }
 
     public function broadcastOn()
     {
-        $channels = [
-            new Channel("user.{$this->appointment->patient->contact_number}"),
-            new PrivateChannel('admin.notifications')
-        ];
-
-        if ($this->appointment->doctor_id) {
-            $channels[] = new Channel("user.{$this->appointment->doctor_id}");
-        }
-
-        return $channels;
+        return new Channel("user.{$this->patient->contact_number}");
     }
 
     public function broadcastAs()
     {
-        return 'appointment.updated';
+        return "appointment.{$this->event}";
     }
 
     public function broadcastWith()
     {
         return $this->eventData;
-    }
-
-    private function generateMessage(string $event, ?string $doctorName = null)
-    {
-        $doctorText = $doctorName ? " with Dr. {$doctorName}" : "";
-
-        $messages = [
-            'confirmed'     => "Your appointment{$doctorText} has been confirmed",
-            'cancelled'     => "Your appointment{$doctorText} has been cancelled",
-            'status_changed'=> "Your appointment{$doctorText} status has been updated",
-            'reminder'      => "Reminder: You have an appointment{$doctorText} scheduled soon",
-            'updated'       => "Your appointment{$doctorText} has been updated",
-            'in_progress'   => "Your appointment{$doctorText} is now in progress",
-            'completed'     => "Your appointment{$doctorText} has been completed"
-        ];
-
-        return $messages[$event] ?? "Your appointment{$doctorText} has been updated";
     }
 }
