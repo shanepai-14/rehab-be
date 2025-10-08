@@ -9,7 +9,7 @@ use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
-
+use App\Events\SendSmsEvent;
 class AppointmentReminderForDoctor implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
@@ -38,6 +38,8 @@ class AppointmentReminderForDoctor implements ShouldBroadcast
             'related_id' => $this->appointment->id,
             'action_url' => '/appointments/' . $this->appointment->id
         ]);
+
+         event(new SendSmsEvent($this->appointment->doctor->contact_number, $message));
         
         $this->eventData = [
             'appointment_id' => $this->appointment->id,

@@ -22,8 +22,8 @@ class NotificationService
      */
     public function sendAppointmentNotifications(Appointment $appointment, string $event, string $oldStatus = null)
     {
-        // Send SMS notification
-        $this->sendSmsNotification($appointment, $event);
+        // // Send SMS notification
+        // $this->sendSmsNotification($appointment, $event);
 
         // Send real-time notification via Laravel Events/Broadcasting
         $this->sendRealtimeNotification($appointment, $event, $oldStatus);

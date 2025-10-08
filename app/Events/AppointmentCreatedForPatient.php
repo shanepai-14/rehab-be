@@ -10,7 +10,7 @@ use Illuminate\Broadcasting\InteractsWithSockets;
 use Illuminate\Contracts\Broadcasting\ShouldBroadcast;
 use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
-
+use App\Events\SendSmsEvent;
 class AppointmentCreatedForPatient implements ShouldBroadcast
 {
     use Dispatchable, InteractsWithSockets, SerializesModels;
@@ -41,6 +41,8 @@ class AppointmentCreatedForPatient implements ShouldBroadcast
             'related_id' => $this->appointment->id,
             'action_url' => '/appointments/' . $this->appointment->id
         ]);
+
+         event(new SendSmsEvent($this->patient->contact_number, $message));
         
         $this->eventData = [
             'appointment_id' => $this->appointment->id,
