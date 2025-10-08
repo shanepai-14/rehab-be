@@ -81,6 +81,7 @@ class AuthController extends Controller
                     'municipality' => $user->municipality,
                     'barangay' => $user->barangay,
                     'district' => $user->district,
+                    'address' => $user->address,
                     'patient_type' => $user->patient_type,
                     'birth_date' => $user->birth_date,
                     'role' => $user->role,
