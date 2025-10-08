@@ -107,10 +107,14 @@ class AdminController extends Controller
                 'address' => $request->address,
                 'contact_number' => $request->contact_number,
                 'province' => $request->province,
+                'municipality' => $request->municipality,
+                'barangay' =>  $request->barangay,
                 'district' => $request->district,
                 'email' => $request->email,
                 'password' => Hash::make($request->password),
                 'role' => User::ROLE_DOCTOR,
+                'specialization' => $request->specialization,
+                'license_number' => $request->license_number,
                 'is_verified' => true,
                 'created_by' => $request->user()->id
             ]);

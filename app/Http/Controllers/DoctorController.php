@@ -42,6 +42,13 @@ class DoctorController extends Controller
                                            ->whereDate('appointment_date', now()->toDateString())
                                            ->count();
 
+            $completedAppointments = Appointment::where('doctor_id', $user->id)
+                                           ->where('status', 'completed')
+                                           ->count();
+            $totalAppointments = Appointment::where('doctor_id', $user->id)
+                                            ->where('status', '!=', 'cancelled') 
+                                            ->count();                           
+
             // Get recent appointments
             $recentAppointments = Appointment::with(['patient'])
                                             ->where('doctor_id', $user->id)
@@ -60,6 +67,8 @@ class DoctorController extends Controller
                     'patients_in_district' => $patientsInDistrict,
                     'upcoming_appointments' => $doctorAppointments,
                     'today_appointments' => $todayAppointments,
+                    'completed_appointments'=> $completedAppointments,
+                    'total_appointments'=> $totalAppointments,
                     'district' => $user->district
                 ],
                 'recent_appointments' => $recentAppointments->map(function ($appointment) {
