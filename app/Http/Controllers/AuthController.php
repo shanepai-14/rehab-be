@@ -148,7 +148,10 @@ class AuthController extends Controller
                 'contact_number' => $request->contact_number,
                 'province' => $request->province,
                 'district' => $request->district,
+                'barangay' =>$request->barangay,
                 'email' => $request->email,
+                'municipality' => $request->municipality,
+                'patient_type' => $request->patient_type,
                 'password' => Hash::make($request->password),
                 'role' => User::ROLE_PATIENT,
                 'is_verified' => false
