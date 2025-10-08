@@ -44,36 +44,15 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
 
     // ========== APPOINTMENT ROUTES ==========
     Route::prefix('appointments')->group(function () {
-        
-        // Get appointments (filtered by user role)
         Route::get('/', [AppointmentController::class, 'index']);
-        
-        // Create appointment (doctors and admins only)
         Route::post('/', [AppointmentController::class, 'create']);
-        
-        // Get single appointment
-        Route::get('/{appointment}', [AppointmentController::class, 'show'])
-             ->middleware('can:view,appointment');
-        
-        // Update appointment status (all authenticated users can update status of their appointments)
-        Route::patch('/{appointment}/status', [AppointmentController::class, 'updateStatus'])
-             ->middleware('can:updateStatus,appointment');
-        
-        // Update appointment details (doctors and admins only)
-        Route::put('/{appointment}', [AppointmentController::class, 'update'])
-             ->middleware('can:update,appointment');
-        
-        // Delete appointment (admin only)
-        Route::delete('/{appointment}', [AppointmentController::class, 'destroy'])
-             ->middleware('role:admin');
-        
-        // Get accessible patients for appointment creation (doctors and admins)
-        Route::get('/patients/accessible', [AppointmentController::class, 'getAccessiblePatients'])
-             ->middleware('role:doctor,admin');
-        
-        // Get appointment statistics (for dashboards)
-        Route::get('/stats/overview', [AppointmentController::class, 'getStatistics'])
-             ->middleware('role:doctor,admin');
+        Route::get('/{appointment}', [AppointmentController::class, 'show']);
+        Route::patch('/{appointment}/status', [AppointmentController::class, 'updateStatus']);
+        Route::put('/{appointment}', [AppointmentController::class, 'update']);
+        Route::delete('/{appointment}', [AppointmentController::class, 'destroy']);
+        Route::get('/patients/{patientId}', [AppointmentController::class, 'getPatientAppointments']); 
+        Route::get('/patients/accessible', [AppointmentController::class, 'getAccessiblePatients']);
+        Route::get('/stats/overview', [AppointmentController::class, 'getStatistics']);
     });
 
      Route::prefix('notifications')->group(function () {
@@ -94,8 +73,7 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
     Route::middleware('role:doctor')->prefix('doctor')->group(function () {
         Route::get('/dashboard', [DoctorController::class, 'dashboard']);
         Route::get('/patients', [DoctorController::class, 'getPatients']);
-        Route::get('/patients/{patient}', [DoctorController::class, 'getPatientDetails'])
-             ->middleware('can:access-patient,patient');
+        Route::get('/patients/{patient}', [DoctorController::class, 'getPatientDetails']);
         Route::get('/appointments', [DoctorController::class, 'getAppointments']);
         Route::get('/stats/district', [DoctorController::class, 'getDistrictStats']);
         

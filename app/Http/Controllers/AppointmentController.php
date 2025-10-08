@@ -22,181 +22,6 @@ class AppointmentController extends Controller
         $this->notificationService = $notificationService;
     }
 
-// public function create(Request $request)
-// {
-//     try {
-//         $user = $request->user();
-
-//         // Check if user has permission to create appointments
-//         if (!in_array($user->role, [User::ROLE_DOCTOR, User::ROLE_ADMIN])) {
-//             return response()->json([
-//                 'success' => false,
-//                 'message' => 'Unauthorized. Only doctors and admins can create appointments.'
-//             ], 403);
-//         }
-
-//         $validator = Validator::make($request->all(), [
-//             'patient_id' => 'required|exists:users,id',
-//             'agenda' => 'required|string|max:255',
-//             'details' => 'required|string',
-//             'appointment_date' => 'required|date|after_or_equal:today',
-//             'appointment_time' => 'required|date_format:H:i',
-//             'location' => 'nullable|string|max:255',
-//             'duration' => 'nullable|integer|min:15|max:240', // in minutes
-//             'priority' => 'nullable|in:low,normal,high,urgent',
-//             'doctor_id' => 'nullable|exists:users,id' // For admin creating appointments
-//         ]);
-
-//         if ($validator->fails()) {
-//             return response()->json([
-//                 'success' => false,
-//                 'message' => 'Validation failed',
-//                 'errors' => $validator->errors()
-//             ], 422);
-//         }
-
-//         // Get patient details
-//         $patient = User::where('id', $request->patient_id)
-//                        ->where('role', User::ROLE_PATIENT)
-//                        ->first();
-
-//         if (!$patient) {
-//             return response()->json([
-//                 'success' => false,
-//                 'message' => 'Patient not found'
-//             ], 404);
-//         }
-
-//         // Determine the doctor for this appointment
-//         $doctorId = $user->role === User::ROLE_DOCTOR ? $user->id : $request->doctor_id;
-        
-//         if (!$doctorId) {
-//             return response()->json([
-//                 'success' => false,
-//                 'message' => 'Doctor ID is required for admin-created appointments'
-//             ], 422);
-//         }
-
-//         // Validate doctor exists and has correct role
-//         $doctor = User::where('id', $doctorId)
-//                      ->where('role', User::ROLE_DOCTOR)
-//                      ->first();
-
-//         if (!$doctor) {
-//             return response()->json([
-//                 'success' => false,
-//                 'message' => 'Doctor not found'
-//             ], 404);
-//         }
-
-//         // For doctors, check if patient is in their assigned district
-//         if ($user->role === User::ROLE_DOCTOR) {
-//             if (!$this->canDoctorAccessPatient($user, $patient)) {
-//                 return response()->json([
-//                     'success' => false,
-//                     'message' => 'You can only create appointments for patients in your assigned district.'
-//                 ], 403);
-//             }
-//         }
-
-//         // Calculate appointment duration and end time
-//         $duration = $request->duration ?? 30; // Default 30 minutes
-        
-//         // Normalize time format - remove seconds if present to match database format
-//         $appointmentTime = $request->appointment_time;
-//         if (strlen($appointmentTime) > 5) {
-//             $appointmentTime = substr($appointmentTime, 0, 5); // Convert "09:00:00" to "09:00"
-//         }
-        
-//         // Properly parse the date and time
-//         try {
-//             $appointmentDateTime = Carbon::createFromFormat('Y-m-d H:i', $request->appointment_date . ' ' . $appointmentTime);
-//             $appointmentEndTime = $appointmentDateTime->copy()->addMinutes($duration);
-            
-      
-            
-//         } catch (\Exception $e) {
-    
-            
-//             return response()->json([
-//                 'success' => false,
-//                 'message' => 'Invalid date or time format',
-//                 'error' => 'Please ensure date is in YYYY-MM-DD format and time is in HH:MM or HH:MM:SS format'
-//             ], 422);
-//         }
-
-//         // Check for schedule overlaps
-//         $overlapCheck = $this->checkScheduleOverlap(
-//             $doctorId,
-//             $request->patient_id,
-//             $appointmentDateTime,
-//             $appointmentEndTime,
-//             null // No appointment ID for new appointments
-//         );
-
-//         if (!$overlapCheck['success']) {
-//             return response()->json($overlapCheck, 409); // 409 Conflict
-//         }
-
-//         // Validate business hours (8 AM to 6 PM)
-//         $startHour = $appointmentDateTime->hour;
-//         $endHour = $appointmentEndTime->hour;
-//         $endMinute = $appointmentEndTime->minute;
-
-//         if ($startHour < 8 || $endHour > 18 || ($endHour === 18 && $endMinute > 0)) {
-//             return response()->json([
-//                 'success' => false,
-//                 'message' => 'Appointments must be scheduled between 8:00 AM and 6:00 PM'
-//             ], 422);
-//         }
-
-//         // Check if appointment is on a weekend (optional business rule)
-//         if ($appointmentDateTime->isWeekend()) {
-//             return response()->json([
-//                 'success' => false,
-//                 'message' => 'Appointments cannot be scheduled on weekends'
-//             ], 422);
-//         }
-
-//         // Create appointment
-//         DB::beginTransaction();
-
-//         $appointment = Appointment::create([
-//             'patient_id' => $request->patient_id,
-//             'doctor_id' => $doctorId,
-//             'created_by' => $user->id,
-//             'agenda' => $request->agenda,
-//             'details' => $request->details,
-//             'appointment_date' => $request->appointment_date,
-//             'appointment_time' => $request->appointment_time,
-//             'location' => $request->location,
-//             'duration' => $duration,
-//             'priority' => $request->priority ?? 'normal',
-//             'status' => 'scheduled'
-//         ]);
-
-//         DB::commit();
-
-//         // Send notifications (uncomment when ready)
-//         $this->sendAppointmentNotifications($appointment, 'created');
-
-//         return response()->json([
-//             'success' => true,
-//             'message' => 'Appointment created successfully',
-//             'data' => [
-//                 'appointment' => $appointment->load(['patient', 'doctor', 'createdBy'])
-//             ]
-//         ], 201);
-
-//     } catch (\Exception $e) {
-//         DB::rollBack();
-//         return response()->json([
-//             'success' => false,
-//             'message' => 'Failed to create appointment',
-//             'error' => config('app.debug') ? $e->getMessage() : null
-//         ], 500);
-//     }
-// }
 
 public function create(Request $request)
     {
@@ -664,76 +489,7 @@ public function getAvailableSlots(Request $request)
 
 
 
-    /**
-     * Get appointments based on user role
-     */
-    // public function index(Request $request)
-    // {
-    //     try {
-    //         $user = $request->user();
-    //         $query = Appointment::with(['patient', 'doctor', 'createdBy']);
-
-    //         // Apply role-based filtering
-    //         switch ($user->role) {
-    //             case User::ROLE_PATIENT:
-    //                 $query->where('patient_id', $user->id);
-    //                 break;
-
-    //             case User::ROLE_DOCTOR:
-    //                 // Doctors can see appointments for patients in their district
-    //                 $query->where(function ($q) use ($user) {
-    //                     $q->where('doctor_id', $user->id)
-    //                       ->orWhereHas('patient', function ($patientQuery) use ($user) {
-    //                           $patientQuery->where('district', $user->district);
-    //                       });
-    //                 });
-    //                 break;
-
-    //             case User::ROLE_ADMIN:
-    //                 // Admins can see all appointments
-    //                 break;
-
-    //             default:
-    //                 return response()->json([
-    //                     'success' => false,
-    //                     'message' => 'Unauthorized access'
-    //                 ], 403);
-    //         }
-
-    //         // Apply filters
-    //         if ($request->has('date_from')) {
-    //             $query->where('appointment_date', '>=', $request->date_from);
-    //         }
-
-    //         if ($request->has('date_to')) {
-    //             $query->where('appointment_date', '<=', $request->date_to);
-    //         }
-
-    //         if ($request->has('status')) {
-    //             $query->where('status', $request->status);
-    //         }
-
-    //         if ($request->has('priority')) {
-    //             $query->where('priority', $request->priority);
-    //         }
-
-    //         $appointments = $query->orderBy('appointment_date')
-    //                              ->orderBy('appointment_time')
-    //                              ->paginate(15);
-
-    //         return response()->json([
-    //             'success' => true,
-    //             'data' => $appointments
-    //         ]);
-
-    //     } catch (\Exception $e) {
-    //         return response()->json([
-    //             'success' => false,
-    //             'message' => 'Failed to retrieve appointments',
-    //             'error' => config('app.debug') ? $e->getMessage() : null
-    //         ], 500);
-    //     }
-    // }
+ 
 
     public function index(Request $request)
 {
@@ -1243,6 +999,166 @@ public function destroy(Request $request, Appointment $appointment)
         return response()->json([
             'success' => false,
             'message' => 'Failed to delete appointment',
+            'error' => config('app.debug') ? $e->getMessage() : null
+        ], 500);
+    }
+}
+
+public function getPatientAppointments(Request $request, $patientId)
+{
+    try {
+        $user = $request->user();
+        
+        // Authorization check
+        // Only allow doctors to view their district patients, admins to view all, 
+        // and patients to view their own appointments
+        if ($user->role === User::ROLE_PATIENT && $user->id != $patientId) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Unauthorized to view this patient\'s appointments'
+            ], 403);
+        }
+        
+        if ($user->role === User::ROLE_DOCTOR) {
+            // Check if patient is in doctor's district
+            $patient = User::find($patientId);
+            if (!$patient || $patient->district !== $user->district) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Unauthorized to view this patient\'s appointments'
+                ], 403);
+            }
+        }
+        
+        // Load appointments for the specific patient
+        $query = Appointment::with(['patients', 'patient', 'doctor', 'createdBy'])
+            ->where(function($q) use ($patientId) {
+                // Check both old patient_id field and new patients relationship
+                $q->where('patient_id', $patientId)
+                  ->orWhereHas('patients', function($patientQuery) use ($patientId) {
+                      $patientQuery->where('users.id', $patientId);
+                  });
+            });
+
+        // Apply optional filters
+        if ($request->has('date_from')) {
+            $query->where('appointment_date', '>=', $request->date_from);
+        }
+
+        if ($request->has('date_to')) {
+            $query->where('appointment_date', '<=', $request->date_to);
+        }
+
+        if ($request->has('status')) {
+            $query->where('status', $request->status);
+        }
+
+        if ($request->has('priority')) {
+            $query->where('priority', $request->priority);
+        }
+
+        // Order by date (most recent first by default, or oldest first if specified)
+        $sortOrder = $request->get('sort_order', 'desc'); // 'desc' for newest first, 'asc' for oldest
+        $query->orderBy('appointment_date', $sortOrder)
+              ->orderBy('appointment_time', $sortOrder);
+
+        // Get paginated or all results based on request
+        $isPaginated = $request->has('paginate') && $request->boolean('paginate');
+        
+        if ($isPaginated) {
+            $appointments = $query->paginate($request->get('per_page', 15));
+            $appointmentsCollection = $appointments->getCollection();
+        } else {
+            // Return all appointments without pagination
+            $appointments = $query->get();
+            $appointmentsCollection = $appointments;
+        }
+
+        // Transform the data
+        $transformedAppointments = $appointmentsCollection->map(function ($appointment) {
+            return [
+                'id' => $appointment->id,
+                
+                // Multiple patients data
+                'patients' => $appointment->patients->map(function ($patient) {
+                    return [
+                        'id' => $patient->id,
+                        'name' => $patient->first_name . ' ' . $patient->last_name,
+                        'first_name' => $patient->first_name,
+                        'last_name' => $patient->last_name,
+                        'contact_number' => $patient->contact_number,
+                        'district' => $patient->district,
+                    ];
+                }),
+                'patient_count' => $appointment->patients->count(),
+                'patient_names' => $appointment->patient_names,
+                
+                // Backward compatibility
+                'patient_id' => $appointment->patient_id,
+                'patient' => $appointment->patient ? 
+                    $appointment->patient->first_name . ' ' . $appointment->patient->last_name : 
+                    $appointment->patient_names,
+                
+                // Doctor information
+                'doctor_id' => $appointment->doctor_id,
+                'doctor' => $appointment->doctor ? 
+                    'Dr. ' . $appointment->doctor->first_name . ' ' . $appointment->doctor->last_name : 
+                    'Unassigned',
+                'doctor_specialization' => $appointment->doctor->specialization ?? 'General Medicine',
+                
+                // Appointment details
+                'agenda' => $appointment->agenda,
+                'details' => $appointment->details,
+                'appointment_date' => $appointment->appointment_date->format('Y-m-d'),
+                'formatted_date' => $appointment->formatted_date,
+                'appointment_time' => $appointment->formatted_time,
+                'raw_time' => $appointment->appointment_time,
+                'location' => $appointment->location,
+                'duration' => $appointment->duration,
+                'priority' => $appointment->priority,
+                'status' => $appointment->status,
+                'notes' => $appointment->notes,
+                
+                // Meta information
+                'is_multi_patient' => $appointment->is_multi_patient,
+                'is_today' => $appointment->isToday(),
+                'is_upcoming' => $appointment->isUpcoming(),
+                'status_color' => $appointment->status_color,
+                'priority_color' => $appointment->priority_color,
+                
+                // Timestamps
+                'created_at' => $appointment->created_at->format('Y-m-d H:i:s'),
+                'updated_at' => $appointment->updated_at->format('Y-m-d H:i:s'),
+                'created_by' => $appointment->createdBy->first_name ?? 'System'
+            ];
+        });
+
+        // Build response based on pagination
+        if ($isPaginated) {
+            return response()->json([
+                'success' => true,
+                'data' => $transformedAppointments,
+                'meta' => [
+                    'current_page' => $appointments->currentPage(),
+                    'last_page' => $appointments->lastPage(),
+                    'per_page' => $appointments->perPage(),
+                    'total' => $appointments->total(),
+                ]
+            ]);
+        } else {
+            return response()->json([
+                'success' => true,
+                'data' => $transformedAppointments,
+                'meta' => [
+                    'total' => $transformedAppointments->count(),
+                ]
+            ]);
+        }
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to retrieve patient appointments',
             'error' => config('app.debug') ? $e->getMessage() : null
         ], 500);
     }
