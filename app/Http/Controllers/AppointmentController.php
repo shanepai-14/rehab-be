@@ -1018,9 +1018,6 @@ public function getAvailableSlots(Request $request)
         try {
             $appointment->load(['patient', 'doctor']);
 
-            // Send SMS via Movider
-            $this->notificationService->sendSmsNotification($appointment, $event);
-
             // Send real-time notification via Laravel Events/Broadcasting
             $this->notificationService->sendRealtimeNotification($appointment, $event);
 

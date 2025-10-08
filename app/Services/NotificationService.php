@@ -32,30 +32,30 @@ class NotificationService
     /**
      * Send SMS notification via Movider
      */
-    public function sendSmsNotification(Appointment $appointment, string $event)
-    {
-        // Check if appointment has patients relationship
-        if ($appointment->patients && $appointment->patients->count() > 0) {
-            // Send SMS to each patient in the appointment
-            foreach ($appointment->patients as $patient) {
-                $message = $this->generateSmsMessage($appointment, $event, $patient);
-                $recipient = $patient->contact_number;
+    // public function sendSmsNotification(Appointment $appointment, string $event)
+    // {
+    //     // Check if appointment has patients relationship
+    //     if ($appointment->patients && $appointment->patients->count() > 0) {
+    //         // Send SMS to each patient in the appointment
+    //         foreach ($appointment->patients as $patient) {
+    //             $message = $this->generateSmsMessage($appointment, $event, $patient);
+    //             $recipient = $patient->contact_number;
                 
 
-                    event(new SendSmsEvent($recipient, $message));
+    //                 event(new SendSmsEvent($recipient, $message));
               
-            }
-        } 
-        // Fallback to single patient if patients relationship doesn't exist
-        elseif ($appointment->patient) {
-            $message = $this->generateSmsMessage($appointment, $event, $appointment->patient);
-            $recipient = $appointment->patient->contact_number;
+    //         }
+    //     } 
+    //     // Fallback to single patient if patients relationship doesn't exist
+    //     elseif ($appointment->patient) {
+    //         $message = $this->generateSmsMessage($appointment, $event, $appointment->patient);
+    //         $recipient = $appointment->patient->contact_number;
             
 
-                event(new SendSmsEvent($recipient, $message));
+    //             event(new SendSmsEvent($recipient, $message));
        
-        }
-    }
+    //     }
+    // }
 
     /**
      * Send real-time notification via Laravel Events/Broadcasting
