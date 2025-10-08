@@ -196,6 +196,7 @@ class AuthController extends Controller
                 'birth_date' => 'required|date|before:today',
                 'address' => 'required|string',
                 'province' => 'required|string|max:255',
+                'patient_type' => 'nullable|string|max:255',
                 'municipality' => 'nullable|string|max:255',
                 'barangay' => 'nullable|string|max:255',
                 'specialization' => 'nullable|string|max:255',
@@ -221,6 +222,7 @@ class AuthController extends Controller
                 'province',
                 'municipality',
                 'barangay',
+                'patient_type',
                 'specialization',
                 'license_number'
             ]));
