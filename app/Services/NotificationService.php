@@ -126,9 +126,7 @@ class NotificationService
                     foreach ($appointment->patients as $patient) {
                         event(new AppointmentCreatedForPatient($appointment, $patient));
                     }
-                } elseif ($appointment->patient) {
-                    event(new AppointmentCreatedForPatient($appointment, $appointment->patient));
-                }
+                } 
                 
                 // Send to doctor
                 event(new AppointmentCreatedForDoctor($appointment));
@@ -186,7 +184,8 @@ class NotificationService
         Log::info('Real-time notification sent', [
             'appointment_id' => $appointment->id,
             'event' => $event,
-            'patient_count' => $appointment->patients ? $appointment->patients->count() : 1
+            'patient_count' => $appointment->patients ? $appointment->patients->count() : 1,
+            'patient' => $appointment->patients
         ]);
 
     } catch (\Exception $e) {
