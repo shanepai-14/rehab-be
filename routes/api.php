@@ -91,6 +91,7 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
         Route::post('/users/{user}/verify', [AdminController::class, 'verifyUser']);
         Route::post('/create-doctor', [AdminController::class, 'createDoctor']);
         Route::put('/users/{user}', [AdminController::class, 'updateUser']);
+        Route::post('/users/{user}/reset-password', [AdminController::class, 'resetUserPassword']);
         Route::delete('/users/{user}', [AdminController::class, 'deleteUser']);
         
         // Admin appointment management

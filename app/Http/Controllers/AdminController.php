@@ -169,7 +169,7 @@ class AdminController extends Controller
             }
 
             $users = $query->select([
-                'id', 'first_name', 'last_name', 'middle_initial', 'email', 
+                'id', 'first_name', 'last_name', 'middle_initial', 'email', 'district','patient_type' ,'province','municipality' , 'barangay',
                 'contact_number', 'role', 'is_verified', 'created_at'
             ])->paginate(15);
 
@@ -224,4 +224,180 @@ class AdminController extends Controller
             ], 500);
         }
     }
+
+    /**
+ * Verify a user account
+ */
+public function verifyUser(Request $request, User $user)
+{
+    try {
+        $user->update(['is_verified' => true]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'User verified successfully',
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->full_name,
+                'is_verified' => $user->is_verified
+            ]
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to verify user',
+            'error' => config('app.debug') ? $e->getMessage() : null
+        ], 500);
+    }
+}
+
+/**
+ * Update user information
+ */
+public function updateUser(Request $request, User $user)
+{
+    try {
+        $validator = Validator::make($request->all(), [
+            'first_name' => 'required|string|max:255',
+            'last_name' => 'required|string|max:255',
+            'middle_initial' => 'nullable|string|max:1',
+            'email' => 'required|email|unique:users,email,' . $user->id,
+            'contact_number' => 'required|string|unique:users,contact_number,' . $user->id,
+            'district' => 'required|in:1,2,3',
+            'role' => 'required|in:patient,doctor,admin',
+            'is_verified' => 'boolean',
+            'specialization' => 'nullable|string|max:255',
+            'license_number' => 'nullable|string|max:255',
+            'province' => 'nullable|string|max:255',
+            'municipality' => 'nullable|string|max:255',
+            'barangay' => 'nullable|string|max:255',
+            'address' => 'nullable|string|max:500',
+            'patient_type' => 'nullable|string|max:500',
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $user->update($request->only([
+            'first_name',
+            'last_name',
+            'middle_initial',
+            'email',
+            'contact_number',
+            'district',
+            'role',
+            'is_verified',
+            'specialization',
+            'license_number',
+            'province',
+            'municipality',
+            'barangay',
+            'address',
+            'patient_type'
+        ]));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'User updated successfully',
+            'user' => [
+                'id' => $user->id,
+                'name' => $user->full_name,
+                'email' => $user->email,
+                'role' => $user->role,
+                'is_verified' => $user->is_verified
+            ]
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to update user',
+            'error' => config('app.debug') ? $e->getMessage() : null
+        ], 500);
+    }
+}
+
+/**
+ * Reset user password
+ */
+public function resetUserPassword(Request $request, User $user)
+{
+    try {
+        $validator = Validator::make($request->all(), [
+            'password' => 'required|string|min:8'
+        ]);
+
+        if ($validator->fails()) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Validation failed',
+                'errors' => $validator->errors()
+            ], 422);
+        }
+
+        $user->update([
+            'password' => Hash::make($request->password)
+        ]);
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Password reset successfully'
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to reset password',
+            'error' => config('app.debug') ? $e->getMessage() : null
+        ], 500);
+    }
+}
+
+/**
+ * Delete a user
+ */
+public function deleteUser(Request $request, User $user)
+{
+    try {
+        // Prevent deleting own account
+        if ($user->id === $request->user()->id) {
+            return response()->json([
+                'success' => false,
+                'message' => 'You cannot delete your own account'
+            ], 403);
+        }
+
+        // Check if user has appointments
+        $hasAppointments = $user->patientAppointments()->exists() || 
+                          $user->doctorAppointments()->exists();
+
+        if ($hasAppointments) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Cannot delete user with existing appointments'
+            ], 400);
+        }
+
+        $userName = $user->full_name;
+        $user->delete();
+
+        return response()->json([
+            'success' => true,
+            'message' => "User {$userName} deleted successfully"
+        ]);
+
+    } catch (\Exception $e) {
+        return response()->json([
+            'success' => false,
+            'message' => 'Failed to delete user',
+            'error' => config('app.debug') ? $e->getMessage() : null
+        ], 500);
+    }
+}
 }
