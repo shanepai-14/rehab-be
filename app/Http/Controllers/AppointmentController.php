@@ -1132,6 +1132,7 @@ public function getAvailableSlots(Request $request)
             'doctor_id' => 'nullable|exists:users,id',
             'agenda' => 'sometimes|required|string|max:255',
             'details' => 'sometimes|required|string',
+            'status' => 'sometimes|required|string',
             'appointment_date' => 'sometimes|required|date|after_or_equal:today',
             'appointment_time' => 'sometimes|required|date_format:H:i',
             'location' => 'nullable|string|max:255',
@@ -1180,7 +1181,7 @@ public function getAvailableSlots(Request $request)
             // Update appointment fields
             $appointment->fill($request->only([
                 'doctor_id', 'appointment_date', 'appointment_time',
-                'agenda', 'details', 'location', 'duration', 'priority'
+                'agenda', 'details', 'location', 'duration', 'priority', 'status'
             ]));
             $appointment->updated_by = $user->id;
             $appointment->save();
