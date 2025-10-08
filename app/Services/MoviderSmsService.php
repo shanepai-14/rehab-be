@@ -263,4 +263,11 @@ class MoviderSmsService
             ];
         }
     }
+
+       public function sendSms($contactNumber, $message)
+    {
+        event(new SendSmsEvent($contactNumber, $message));
+
+        return true;
+    }
 }

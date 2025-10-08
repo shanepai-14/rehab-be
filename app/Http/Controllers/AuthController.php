@@ -4,11 +4,14 @@ namespace App\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\User;
+use App\Models\OtpVerification;
 use App\Services\OtpService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Validator;
+use Illuminate\Support\Str;
+use Carbon\Carbon;
 use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
@@ -178,12 +181,9 @@ class AuthController extends Controller
         }
     }
 
-   
-
-
-/**
- * Update patient profile
- */
+    /**
+     * Update patient profile
+     */
     public function updateProfile(Request $request)
     {
         try {
@@ -343,6 +343,9 @@ class AuthController extends Controller
         }
     }
 
+    /**
+     * Resend OTP
+     */
     public function resendOtp(Request $request)
     {
         try {
@@ -368,15 +371,13 @@ class AuthController extends Controller
                 ], 400);
             }
 
-            // Optional: Check for rate limiting (prevent spam)
-            $recentOtp = \App\Models\OtpVerification::where('contact_number', $request->contact_number)
-                ->where('created_at', '>', now()->subMinute())
-                ->first();
-
-            if ($recentOtp) {
+            // Check for rate limiting using service
+            if ($this->otpService->hasRecentOtpRequest($request->contact_number)) {
+                $remainingSeconds = $this->otpService->getRemainingCooldownTime($request->contact_number);
+                
                 return response()->json([
                     'success' => false,
-                    'message' => 'Please wait before requesting another code.'
+                    'message' => "Please wait {$remainingSeconds} seconds before requesting another code."
                 ], 429);
             }
 
@@ -399,6 +400,192 @@ class AuthController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Failed to resend OTP. Please try again.',
+                'error' => config('app.debug') ? $e->getMessage() : null
+            ], 500);
+        }
+    }
+
+    /**
+     * FORGOT PASSWORD - Send OTP for password reset
+     */
+    public function forgotPassword(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'contact' => 'required|string'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid input',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            $contact = $request->contact;
+            
+            // Find user by email or phone
+            $user = User::where('email', $contact)
+                        ->orWhere('contact_number', $contact)
+                        ->first();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Account not found with this email or phone number'
+                ], 404);
+            }
+
+            // Check for rate limiting
+            if ($this->otpService->hasRecentOtpRequest($user->contact_number)) {
+                $remainingSeconds = $this->otpService->getRemainingCooldownTime($user->contact_number);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => "Please wait {$remainingSeconds} seconds before requesting another code."
+                ], 429);
+            }
+
+            // Generate and send password reset OTP using service
+            $otpSent = $this->otpService->generatePasswordResetOtp($user->contact_number);
+
+            if (!$otpSent) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Failed to send verification code. Please try again.'
+                ], 500);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Verification code sent successfully',
+                'contact_number' => $user->contact_number
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to send verification code. Please try again.',
+                'error' =>  $e->getMessage() 
+            ], 500);
+        }
+    }
+
+    /**
+     * VERIFY RESET OTP - Verify OTP for password reset
+     */
+    public function verifyResetOtp(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'contact_number' => 'required|string',
+                'otp' => 'required|string|size:6'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid input',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            // Verify OTP using service
+            $verified = $this->otpService->verifyPasswordResetOtp($request->contact_number, $request->otp);
+
+            if (!$verified) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Invalid or expired verification code'
+                ], 400);
+            }
+
+            // Generate reset token
+            $resetToken = Str::random(64);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'OTP verified successfully',
+                'reset_token' => $resetToken
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Verification failed. Please try again.',
+                'error' =>  $e->getMessage() 
+            ], 500);
+        }
+    }
+
+    /**
+     * RESET PASSWORD - Reset user password
+     */
+    public function resetPassword(Request $request)
+    {
+        try {
+            $validator = Validator::make($request->all(), [
+                'reset_token' => 'required|string',
+                'contact_number' => 'required|string',
+                'new_password' => [
+                    'required',
+                    'string',
+                    'min:8',
+                    'regex:/[a-z]/',      // at least one lowercase
+                    'regex:/[A-Z]/',      // at least one uppercase
+                    'regex:/[0-9]/',      // at least one number
+                ],
+                'confirm_password' => 'required|string|same:new_password'
+            ]);
+
+            if ($validator->fails()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Validation failed',
+                    'errors' => $validator->errors()
+                ], 422);
+            }
+
+            // Find user
+            $user = User::where('contact_number', $request->contact_number)->first();
+
+            if (!$user) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'User not found'
+                ], 404);
+            }
+
+            // Verify that OTP was used recently (within last 30 minutes)
+            $recentOtp = OtpVerification::where('contact_number', $request->contact_number)
+                ->where('is_used', true)
+                ->where('updated_at', '>', Carbon::now()->subMinutes(30))
+                ->first();
+
+            if (!$recentOtp) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Reset session expired. Please request a new verification code.'
+                ], 400);
+            }
+
+            // Update password
+            $user->password = Hash::make($request->new_password);
+            $user->save();
+
+            // Delete the OTP record
+            $recentOtp->delete();
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Password reset successfully'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Failed to reset password. Please try again.',
                 'error' => config('app.debug') ? $e->getMessage() : null
             ], 500);
         }
