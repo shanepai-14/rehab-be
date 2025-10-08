@@ -118,7 +118,7 @@ class DoctorController extends Controller
             }
 
       
-                $query->where('is_verified', $request->boolean('verified'));
+            $query->where('is_verified', true);
             
 
             $patients = $query->select([
