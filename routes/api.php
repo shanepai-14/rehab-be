@@ -9,6 +9,7 @@ use App\Http\Controllers\AdminController;
 use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\AuthController;
 use App\Http\Controllers\ChatController;
+use App\Http\Controllers\PatientProgressRecordController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -102,6 +103,15 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
         // District and system management
         Route::get('/districts/stats', [AdminController::class, 'getDistrictStats']);
         Route::get('/system/health', [AdminController::class, 'getSystemHealth']);
+    });
+
+    // ========== PATIENT PROGRESS RECORD ROUTES ==========
+    Route::prefix('progress-records')->group(function () {
+        Route::get('/', [PatientProgressRecordController::class, 'index']);
+        Route::post('/', [PatientProgressRecordController::class, 'store']);
+        Route::get('/{record}', [PatientProgressRecordController::class, 'show']);
+        Route::put('/{record}', [PatientProgressRecordController::class, 'update']);
+        Route::delete('/{record}', [PatientProgressRecordController::class, 'destroy']);
     });
 
         Route::prefix('chat')->group(function () {
