@@ -719,7 +719,7 @@ public function getAvailableSlots(Request $request)
 
             // Get patients in doctor's assigned district
             $patients = User::where('role', User::ROLE_PATIENT)
-                           ->where('district_id', $user->district_id)
+                           ->where('district', $user->district)
                            ->select(['id', 'first_name', 'last_name', 'middle_initial', 'contact_number', 'email'])
                            ->get();
 

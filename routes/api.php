@@ -51,9 +51,9 @@ Route::middleware(['auth:sanctum', 'verified'])->group(function () {
         Route::patch('/{appointment}/status', [AppointmentController::class, 'updateStatus']);
         Route::put('/{appointment}', [AppointmentController::class, 'update']);
         Route::delete('/{appointment}', [AppointmentController::class, 'destroy']);
-        Route::get('/patients/{patientId}', [AppointmentController::class, 'getPatientAppointments']); 
         Route::get('/patients/accessible', [AppointmentController::class, 'getAccessiblePatients']);
         Route::get('/stats/overview', [AppointmentController::class, 'getStatistics']);
+        Route::get('/patients/{patientId}', [AppointmentController::class, 'getPatientAppointments']); 
     });
 
      Route::prefix('notifications')->group(function () {
